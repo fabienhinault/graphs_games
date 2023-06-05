@@ -1,0 +1,178 @@
+#lang racket
+
+(require rackunit)
+
+(define (rec-couples l)
+    (if (null? l)
+        '()
+        (append
+         (map
+          (lambda (_) (list (car l) _))
+          (cdr l))
+         (rec-couples (cdr l)))))
+
+(check-equal? (rec-couples '(a z e r)) '((a z) (a e) (a r) (z e) (z r) (e r)) "rec_couples")
+
+(define (tailrec-couples res l)
+    (if (null? l)
+        res
+        (tailrec-couples
+         (append
+          res
+          (map (lambda (_) (list (car l) _))
+               (cdr l)))
+         (cdr l))))
+
+(check-equal? (tailrec-couples '() '(a z e r)) '((a z) (a e) (a r) (z e) (z r) (e r)) "tailrec-couples")
+
+(define (tailrec res l update-res)
+    (if (null? l)
+        res
+        (tailrec
+         (update-res res l)
+         (cdr l)
+         update-res)))
+
+(define (rec-parts l)
+    (if (null? l)
+        '(())
+        (append
+         (map
+          (lambda (_) (cons (car l) _))
+          (rec-parts (cdr l)))
+         (rec-parts (cdr l)))))
+
+(check-equal? (rec-parts '(a z e r)) '((a z e r)
+                                       (a z e)
+                                       (a z r)
+                                       (a z)
+                                       (a e r)
+                                       (a e)
+                                       (a r)
+                                       (a)
+                                       (z e r)
+                                       (z e)
+                                       (z r)
+                                       (z)
+                                       (e r)
+                                       (e)
+                                       (r)
+                                       ()))
+
+(define (tailrec-parts-update-result tmp-res x)
+    (append
+     tmp-res
+     (map
+      (lambda (_) (cons x _))
+      tmp-res)))
+
+(check-equal? (tailrec-parts-update-result '((e) ()) 'z) '((e) () (z e) (z)))
+
+(define (tailrec-parts res l)
+    (if (null? l)
+        res
+        (tailrec-parts
+         (tailrec-parts-update-result res (car l))
+         (cdr l))))
+
+(check-equal? (tailrec-parts '(()) '(a z e r)) '(()
+                                                 (a)
+                                                 (z)
+                                                 (z a)
+                                                 (e)
+                                                 (e a)
+                                                 (e z)
+                                                 (e z a)
+                                                 (r)
+                                                 (r a)
+                                                 (r z)
+                                                 (r z a)
+                                                 (r e)
+                                                 (r e a)
+                                                 (r e z)
+                                                 (r e z a)))
+
+(define (graphs1 l)
+  (tailrec-parts '(()) (tailrec-couples '() l)))
+
+(check-equal?
+ (graphs1 '(a z e r))
+ '(()
+   ((a z))
+   ((a e))
+   ((a e) (a z))
+   ((a r))
+   ((a r) (a z))
+   ((a r) (a e))
+   ((a r) (a e) (a z))
+   ((z e))
+   ((z e) (a z))
+   ((z e) (a e))
+   ((z e) (a e) (a z))
+   ((z e) (a r))
+   ((z e) (a r) (a z))
+   ((z e) (a r) (a e))
+   ((z e) (a r) (a e) (a z))
+   ((z r))
+   ((z r) (a z))
+   ((z r) (a e))
+   ((z r) (a e) (a z))
+   ((z r) (a r))
+   ((z r) (a r) (a z))
+   ((z r) (a r) (a e))
+   ((z r) (a r) (a e) (a z))
+   ((z r) (z e))
+   ((z r) (z e) (a z))
+   ((z r) (z e) (a e))
+   ((z r) (z e) (a e) (a z))
+   ((z r) (z e) (a r))
+   ((z r) (z e) (a r) (a z))
+   ((z r) (z e) (a r) (a e))
+   ((z r) (z e) (a r) (a e) (a z))
+   ((e r))
+   ((e r) (a z))
+   ((e r) (a e))
+   ((e r) (a e) (a z))
+   ((e r) (a r))
+   ((e r) (a r) (a z))
+   ((e r) (a r) (a e))
+   ((e r) (a r) (a e) (a z))
+   ((e r) (z e))
+   ((e r) (z e) (a z))
+   ((e r) (z e) (a e))
+   ((e r) (z e) (a e) (a z))
+   ((e r) (z e) (a r))
+   ((e r) (z e) (a r) (a z))
+   ((e r) (z e) (a r) (a e))
+   ((e r) (z e) (a r) (a e) (a z))
+   ((e r) (z r))
+   ((e r) (z r) (a z))
+   ((e r) (z r) (a e))
+   ((e r) (z r) (a e) (a z))
+   ((e r) (z r) (a r))
+   ((e r) (z r) (a r) (a z))
+   ((e r) (z r) (a r) (a e))
+   ((e r) (z r) (a r) (a e) (a z))
+   ((e r) (z r) (z e))
+   ((e r) (z r) (z e) (a z))
+   ((e r) (z r) (z e) (a e))
+   ((e r) (z r) (z e) (a e) (a z))
+   ((e r) (z r) (z e) (a r))
+   ((e r) (z r) (z e) (a r) (a z))
+   ((e r) (z r) (z e) (a r) (a e))
+   ((e r) (z r) (z e) (a r) (a e) (a z))))
+
+(define (replace-all-deep old new l)
+    (cond ((null? l)
+        '())
+          ((equal? l old) new)
+        ((pair? l) (cons (replace-all-deep old new (car l)) (replace-all-deep old new (cdr l))))
+        (else l)))
+
+(check-equal? (replace-all-deep 'a 'b '()) '())
+(check-equal? (replace-all-deep 'a 'b 'a) 'b)
+(check-equal? (replace-all-deep 'a 'b 'b) 'b)
+(check-equal? (replace-all-deep 'a 'b 'z) 'z)
+(check-equal? (replace-all-deep 'a 'b '((a z) (e r))) '((b z) (e r)))
+ 
+;(define (update-res-topo-graphs res l)
