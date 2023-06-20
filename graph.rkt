@@ -140,6 +140,8 @@
 (check-equal? (get-uniqs 'a) '(a))
 (check-equal? (get-uniqs '(a)) '(a))
 (check-equal? (get-uniqs '(a z)) '(z a))
+(check-equal? (get-uniqs '((a e) (a z)))
+              '(z e a))
 (check-equal? (get-uniqs '((z e) (a e) (a z)))
               '(a e z))
 
@@ -148,6 +150,7 @@
 
 (define (topo-graph l)
     (let ((syms (map (λ (_) (gensym)) (range (length l)))))
-      (map (λ (old new) (replace-all-deep  old new (graphs1 syms)))
-           syms
-           l)))
+      (foldl replace-all-deep
+             (graphs1 syms)
+             syms
+             l)))
