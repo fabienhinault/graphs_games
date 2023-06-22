@@ -24,6 +24,20 @@
          (cdr l))))
 
 (check-equal? (tailrec-couples '() '(a z e r)) '((a z) (a e) (a r) (z e) (z r) (e r)) "tailrec-couples")
+(check-equal? (tailrec-couples '() '(a e r z)) '((a e) (a r) (a z) (e r) (e z) (r z)) "tailrec-couples")
+
+(define (tailrec-sorted-couples res l less-than?)
+    (if (null? l)
+        res
+        (tailrec-couples
+         (append
+          res
+          (map (lambda (_) (sort (list (car l) _) less-than?))
+               (cdr l)))
+         (cdr l))))
+
+(check-equal? (tailrec-sorted-couples '() '(a z e r) symbol<?) '((a z) (a e) (a r) (e z) (r z) (e r)) "tailrec-couples")
+(check-equal? (tailrec-sorted-couples '() '(a e r z) symbol<?) '((a z) (a e) (a r) (e r) (e z) (r z)) "tailrec-couples")
 
 (define (tailrec res l update-res)
     (if (null? l)
@@ -92,12 +106,45 @@
                                                  (r e z)
                                                  (r e z a)))
 
+(define (edge<? edge1 edge2)
+  (let ((car1 (car edge1))
+        (car2 (car edge2)))
+    (or (symbol<? car1 car2)
+        (and (not (symbol<? car2 car1)) (symbol<? (cadr edge1) (cadr edge2))))))
+
+(check-true (edge<? '(a b) '(c d)))
+(check-true (edge<? '(a b) '(a c)))
+(check-false (edge<? '(a b) '(a b)))
+(check-false (edge<? '(a c) '(a b)))
+(check-false (edge<? '(c d) '(a b)))
+
+(define (graph<? graph1 graph2)
+  (or (< (length graph1) (length graph2))
+      (and (equal? (length graph1) (length graph2))
+           (not (null? graph1))
+           (let ((edge1 (car graph1))
+                 (edge2 (car graph2)))
+             (or (edge<? edge1 edge2)
+                 (and (not (edge<? edge2 edge1)) (graph<? (cdr graph1) (cdr graph2))))))))
+
+(check-false (graph<? '() '()))
+(check-true  (graph<? '() '((a b))))
+(check-false (graph<? '((a b)) '() ))
+(check-true  (graph<? '((a b)) '((a b) (c d))))
+(check-false (graph<? '((a b) (c d)) '((a b))))
+(check-true  (graph<? '((a b)) '((a c))))
+(check-false (graph<? '((a c)) '((a b))))
+(check-false (graph<? '((a b)) '((a b))))
+(check-false (graph<? '((a b) (a c)) '((a b) (a c))))
+(check-false (graph<? '((a b) (a d)) '((a b) (a c))))
+(check-true  (graph<? '((a b) (a c)) '((a b) (a d))))
+
 (define (graphs1 l)
   (tailrec-parts '(()) (tailrec-couples '() l)))
 
 (check-equal?
  (graphs1 '(a z e))
-'(() ((a z)) ((a e)) ((a e) (a z)) ((z e)) ((z e) (a z)) ((z e) (a e)) ((z e) (a e) (a z))))
+'(() ((a z)) ((a e)) ((a e) (a z)) ((e z)) ((e z) (a z)) ((e z) (a e)) ((e z) (a e) (a z))))
 
 (define (replace-all-deep old new l)
     (cond ((null? l)
@@ -123,12 +170,16 @@
 (check-equal? (add-uniq 'r '(e z a)) '(r e z a))
 
 ; xs and ys are lists of unique symbols, but they can share some symbols
+; the use case is: ys contains symbols from (cdr l) in reverse order
+; xs contains symbols from (car l) in reverse order and we want as
+; result the symbols of l in reverse order.
 (define (append-uniq xs ys)
   (foldl add-uniq xs ys))
 
 (check-equal? (append-uniq '(a) '()) '(a))
 (check-equal? (append-uniq '(a) '(a)) '(a))
 (check-equal? (append-uniq '(a) '(b)) '(b a))
+(check-equal? (append-uniq '(z a) '(e a)) '(e z a))
 (check-equal? (append-uniq '(r e z a) '(t e z a)) '(t r e z a))
 
 
@@ -150,7 +201,8 @@
 
 (define (topo-graph l)
     (let ((syms (map (λ (_) (gensym)) (range (length l)))))
-      (foldl replace-all-deep
-             (graphs1 syms)
-             syms
-             l)))
+      (map
+       (λ (graph)
+         (let ((uniqs (get-uniqs graph)))
+           (foldl replace-all-deep graph (reverse uniqs) (take l (length uniqs)))))
+       (graphs1 syms))))
