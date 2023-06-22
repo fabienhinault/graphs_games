@@ -29,15 +29,16 @@
 (define (tailrec-sorted-couples res l less-than?)
     (if (null? l)
         res
-        (tailrec-couples
+        (tailrec-sorted-couples
          (append
           res
           (map (lambda (_) (sort (list (car l) _) less-than?))
                (cdr l)))
-         (cdr l))))
+         (cdr l)
+         less-than?)))
 
-(check-equal? (tailrec-sorted-couples '() '(a z e r) symbol<?) '((a z) (a e) (a r) (e z) (r z) (e r)) "tailrec-couples")
-(check-equal? (tailrec-sorted-couples '() '(a e r z) symbol<?) '((a z) (a e) (a r) (e r) (e z) (r z)) "tailrec-couples")
+(check-equal? (tailrec-sorted-couples '() '(a z e r) symbol<?) '((a z) (a e) (a r) (e z) (r z) (e r)) "tailrec-sorted-couples")
+(check-equal? (tailrec-sorted-couples '() '(a e r z) symbol<?) '((a e) (a r) (a z) (e r) (e z) (r z)) "tailrec-sorted-couples")
 
 (define (tailrec res l update-res)
     (if (null? l)
@@ -106,6 +107,25 @@
                                                  (r e z)
                                                  (r e z a)))
 
+(define (tailrec-sorted-parts-update-result tmp-res x less-than?)
+    (append
+     tmp-res
+     (map
+      (lambda (_) (sort (cons x _) less-than?))
+      tmp-res)))
+
+(check-equal? (tailrec-sorted-parts-update-result '((e) ()) 'z symbol<?) '((e) () (e z) (z)))
+
+(define (tailrec-sorted-parts res l less-than?)
+    (if (null? l)
+        res
+        (tailrec-sorted-parts
+         (tailrec-sorted-parts-update-result res (car l) less-than?)
+         (cdr l)
+         less-than?)))
+
+(check-equal? (tailrec-sorted-parts '(()) '(a z e) symbol<?) '(() (a) (z) (a z) (e) (a e) (e z) (a e z)))
+
 (define (edge<? edge1 edge2)
   (let ((car1 (car edge1))
         (car2 (car edge2)))
@@ -140,11 +160,11 @@
 (check-true  (graph<? '((a b) (a c)) '((a b) (a d))))
 
 (define (graphs1 l)
-  (tailrec-parts '(()) (tailrec-couples '() l)))
+  (sort (tailrec-sorted-parts '(()) (tailrec-sorted-couples '() l symbol<?) edge<?) graph<?))
 
 (check-equal?
- (graphs1 '(a z e))
-'(() ((a z)) ((a e)) ((a e) (a z)) ((e z)) ((e z) (a z)) ((e z) (a e)) ((e z) (a e) (a z))))
+ (graphs1 '(a e z))
+'(() ((a e)) ((a z)) ((e z)) ((a e) (a z)) ((a e) (e z)) ((a z) (e z)) ((a e) (a z) (e z))))
 
 (define (replace-all-deep old new l)
     (cond ((null? l)
