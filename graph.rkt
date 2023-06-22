@@ -226,3 +226,11 @@
          (let ((uniqs (get-uniqs graph)))
            (foldl replace-all-deep graph (reverse uniqs) (take l (length uniqs)))))
        (graphs1 syms))))
+
+(check-equal? (topo-graph '(a e z))
+              '(() ((a e)) ((a e)) ((a e)) ((a e) (a z)) ((a e) (e z)) ((a e) (z e)) ((a e) (a z) (e z))))
+
+(define (get-degree symbol graph)
+  (length (filter (λ (edge) (member symbol edge)) graph)))
+
+(check-equal? (get-degree 'a '((a z) (e z) (z a))) 2)
