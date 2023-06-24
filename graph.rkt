@@ -1,6 +1,7 @@
 #lang racket
 
 (require rackunit)
+(require srfi/67) ; compare procedures
 
 (define (rec-couples l)
     (if (null? l)
@@ -233,4 +234,23 @@
 (define (get-degree symbol graph)
   (length (filter (λ (edge) (member symbol edge)) graph)))
 
-(check-equal? (get-degree 'a '((a z) (e z) (z a))) 2)
+(check-equal? (get-degree 'a '((a z) (a e))) 2)
+(check-equal? (get-degree 'z '((a z) (a e))) 1)
+(check-equal? (get-degree 'e '((a z) (a e))) 1)
+
+(define (vertice<?* graph)
+  (λ (v1 v2)
+    (> 0
+       (refine-compare
+        (- (get-degree v1 graph) (get-degree v2 graph))
+        (symbol-compare v1 v2)))))
+
+(let* ((G '((a z) (a e)))
+      (v<? (vertice<?* G)))
+  (check-true (v<? 'e 'a))
+  (check-true (v<? 'z 'a))
+  (check-false (v<? 'a 'z))
+  (check-false (v<? 'a 'e))
+  (check-true (v<? 'e 'z))
+  (check-false (v<? 'a 'e)))
+  
