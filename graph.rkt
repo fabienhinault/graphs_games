@@ -245,12 +245,42 @@
         (- (get-degree v1 graph) (get-degree v2 graph))
         (symbol-compare v1 v2)))))
 
+(define (vertice-compare* graph)
+  (λ (v1 v2)
+    (refine-compare
+     (integer-compare (get-degree v1 graph) (get-degree v2 graph))
+     (symbol-compare v1 v2))))
+  
+
 (let* ((G '((a z) (a e)))
-      (v<? (vertice<?* G)))
+       (v<? (vertice<?* G)))
   (check-true (v<? 'e 'a))
   (check-true (v<? 'z 'a))
   (check-false (v<? 'a 'z))
   (check-false (v<? 'a 'e))
   (check-true (v<? 'e 'z))
   (check-false (v<? 'a 'e)))
+
+; the vertices are supposed to be sorted in the edge
+(define (edge<?* graph)
+  (let ((vertice-compare (vertice-compare* graph)))
+    (λ (e1 e2)
+      (> 0
+         (refine-compare
+          (vertice-compare (car e1) (car e2))
+          (vertice-compare (cadr e1) (cadr e2)))))))
+
+
+(let* ((G '((a z) (a e)))
+       (e<? (edge<?* G)))
+  (check-false (e<? '(z a) '(e a)))
+  (check-false (e<? '(z a) '(e a)))
+  (check-true  (e<? '(e a) '(z a))))
   
+
+(define (edge-compare graph)
+  (let ((vertice-compare (vertice-compare* graph)))
+    (λ (e1 e2)
+      (refine-compare
+       (vertice-compare (car e1) (car e2))
+       (vertice-compare (cadr e1) (cadr e2))))))
