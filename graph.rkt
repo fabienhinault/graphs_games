@@ -108,6 +108,29 @@
                                                  (r e z)
                                                  (r e z a)))
 
+(define (graphs1 l)
+  (tailrec-parts '(()) (tailrec-couples '() l)))
+
+(check-equal?
+ (graphs1 '(a e z))
+ '(() ((a e)) ((a z)) ((a z) (a e)) ((e z)) ((e z) (a e)) ((e z) (a z)) ((e z) (a z) (a e))))
+
+(define (contains-deep? l x)
+  (member x (flatten l)))
+
+(define (contains-all? g l)
+  (cond ((null? l) true)
+        ((null? g) false)
+        (else (contains-all? (cdr g) (filter (λ(s) (not (or (equal? s (caar g)) (equal? s (cadar g))))) l)))))
+               
+
+(define (graphs1_1 l)
+  (filter (λ(g) (contains-all? g l)) (graphs1 l)))
+
+(check-equal?
+ (graphs1_1 '(a e z))
+ '(((a z) (a e)) ((e z) (a e)) ((e z) (a z)) ((e z) (a z) (a e))))
+
 (define (tailrec-sorted-parts-update-result tmp-res x less-than?)
     (append
      tmp-res
@@ -160,11 +183,11 @@
 (check-false (graph<? '((a b) (a d)) '((a b) (a c))))
 (check-true  (graph<? '((a b) (a c)) '((a b) (a d))))
 
-(define (graphs1 l)
+(define (graphs2 l)
   (sort (tailrec-sorted-parts '(()) (tailrec-sorted-couples '() l symbol<?) edge<?) graph<?))
 
 (check-equal?
- (graphs1 '(a e z))
+ (graphs2 '(a e z))
 '(() ((a e)) ((a z)) ((e z)) ((a e) (a z)) ((a e) (e z)) ((a z) (e z)) ((a e) (a z) (e z))))
 
 (define (replace-all-deep old new l)
@@ -180,56 +203,33 @@
 (check-equal? (replace-all-deep 'a 'b 'z) 'z)
 (check-equal? (replace-all-deep 'a 'b '((a z) (e r))) '((b z) (e r)))
 
-(define (add-uniq s l)
-  (if (member s l)
-      l
-      (cons s l)))
-
-(check-equal? (add-uniq 'a '()) '(a))
-(check-equal? (add-uniq 'a '(a)) '(a))
-(check-equal? (add-uniq 'b '(a)) '(b a))
-(check-equal? (add-uniq 'r '(e z a)) '(r e z a))
-
-; xs and ys are lists of unique symbols, but they can share some symbols
-; the use case is: ys contains symbols from (cdr l) in reverse order
-; xs contains symbols from (car l) in reverse order and we want as
-; result the symbols of l in reverse order.
-(define (append-uniq xs ys)
-  (foldl add-uniq xs ys))
-
-(check-equal? (append-uniq '(a) '()) '(a))
-(check-equal? (append-uniq '(a) '(a)) '(a))
-(check-equal? (append-uniq '(a) '(b)) '(b a))
-(check-equal? (append-uniq '(z a) '(e a)) '(e z a))
-(check-equal? (append-uniq '(r e z a) '(t e z a)) '(t r e z a))
-
-
-(define (get-uniqs l)
-  (cond ((null? l) '())
-        ((pair? l) (append-uniq (get-uniqs (car l)) (get-uniqs (cdr l))))
-        (else (list l))))
-
-(check-equal? (get-uniqs 'a) '(a))
-(check-equal? (get-uniqs '(a)) '(a))
-(check-equal? (get-uniqs '(a z)) '(z a))
-(check-equal? (get-uniqs '((a e) (a z)))
-              '(z e a))
-(check-equal? (get-uniqs '((z e) (a e) (a z)))
-              '(a e z))
-
-               
-;(define (update-res-topo-graphs res l)
-
-(define (topo-graph l)
+(define (topo-graphs2 l)
     (let ((syms (map (λ (_) (gensym)) (range (length l)))))
       (map
        (λ (graph)
-         (let ((uniqs (get-uniqs graph)))
-           (foldl replace-all-deep graph (reverse uniqs) (take l (length uniqs)))))
-       (graphs1 syms))))
+         (let ((uniqs (remove-duplicates (flatten graph))))
+           (foldl replace-all-deep graph uniqs (take l (length uniqs)))))
+       (graphs2 syms))))
 
-(check-equal? (topo-graph '(a e z))
+(check-equal? (topo-graphs2 '(a e z))
               '(() ((a e)) ((a e)) ((a e)) ((a e) (a z)) ((a e) (e z)) ((a e) (z e)) ((a e) (a z) (e z))))
+
+;'(() ((a e)) ((a z)) ((e z)) ((a e) (a z)) ((a e) (e z)) ((a z) (e z)) ((a e) (a z) (e z))))
+
+(define (check-topo-graph2 l graph expected-uniqs expected-tgraph)
+  (let* ((uniqs (remove-duplicates (flatten graph)))
+         (tgraph (foldl replace-all-deep graph uniqs (take l (length uniqs)))))
+    (check-equal? uniqs expected-uniqs)
+    (check-equal? tgraph expected-tgraph)))
+
+(check-topo-graph2 '(j k l) '((a e)) '(a e) '((j k)))
+(check-topo-graph2 '(j k l) '((a z)) '(a z) '((j k)))
+(check-topo-graph2 '(j k l) '((e z)) '(e z) '((j k)))
+(check-topo-graph2 '(j k l) '((a e) (a z)) '(a e z) '((j k) (j l)))
+(check-topo-graph2 '(j k l) '((a e) (e z)) '(a e z) '((j k) (k l)))
+(check-topo-graph2 '(j k l) '((a z) (e z)) '(a z e) '((j k) (l k)))
+(check-topo-graph2 '(j k l) '((a e) (a z) (e z)) '(a e z) '((j k) (j l) (k l)))
+
 
 (define (get-degree symbol graph)
   (length (filter (λ (edge) (member symbol edge)) graph)))
@@ -284,3 +284,6 @@
       (refine-compare
        (vertice-compare (car e1) (car e2))
        (vertice-compare (cadr e1) (cadr e2))))))
+
+(define (graphs3 l)
+  (sort (tailrec-sorted-parts '(()) (tailrec-sorted-couples '() l symbol<?) edge<?) graph<?))
