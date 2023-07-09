@@ -287,3 +287,25 @@
 
 (define (graphs3 l)
   (sort (tailrec-sorted-parts '(()) (tailrec-sorted-couples '() l symbol<?) edge<?) graph<?))
+
+(define (edge-dot e)
+  (~a (car e) " -- " (cadr e) #\newline))
+
+(check-equal?
+ (edge-dot '(a z)) "a -- z
+")
+
+(define (graph-dot g)
+  (string-append*
+   "strict graph {
+"
+   (append (map edge-dot g)
+                (list "}
+"))))
+
+(define (graph-name g)
+  (~a (apply string-append (map symbol->string (flatten g))) ".dot"))
+
+(define (write-dot-file g)
+  (with-output-to-file (graph-name g)
+    (λ() (printf (graph-dot g)))))
