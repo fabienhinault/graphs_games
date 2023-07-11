@@ -2,6 +2,7 @@
 
 (require rackunit)
 (require srfi/67) ; compare procedures
+(require racket/random)
 
 (define (rec-couples l)
     (if (null? l)
@@ -309,3 +310,11 @@
 (define (write-dot-file g)
   (with-output-to-file (graph-name g)
     (λ() (printf (graph-dot g)))))
+
+(define (random-edge l)
+  (let* ((v1 (random-ref l)))
+    (list v1 (random-ref (remove v1 l)))))
+
+(define (random-graph l nb-edges)
+  (build-list nb-edges (λ(_) (random-edge l))))
+
