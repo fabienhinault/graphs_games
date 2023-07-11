@@ -318,3 +318,12 @@
 (define (random-graph l nb-edges)
   (build-list nb-edges (λ(_) (random-edge l))))
 
+(define (symbols n)
+   (map (λ(_) (string->symbol
+               (string
+                (integer->char
+                 (+ _ (char->integer #\a))))))
+        (range n)))
+
+(check-equal? (symbols 3) '(a b c))
+
