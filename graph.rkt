@@ -28,6 +28,7 @@
 (check-equal? (tailrec-couples '() '(a z e r)) '((a z) (a e) (a r) (z e) (z r) (e r)) "tailrec-couples")
 (check-equal? (tailrec-couples '() '(a e r z)) '((a e) (a r) (a z) (e r) (e z) (r z)) "tailrec-couples")
 
+; outputs sorted couples provided the list l given as argument is sorted first.
 (define (tailrec-sorted-couples res l less-than?)
     (if (null? l)
         res
