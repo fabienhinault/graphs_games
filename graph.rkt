@@ -120,6 +120,7 @@
 (define (contains-deep? l x)
   (member x (flatten l)))
 
+; does the graph g contain all nodes listed in l?
 (define (contains-all? g l)
   (cond ((null? l) true)
         ((null? g) false)
