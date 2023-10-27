@@ -110,6 +110,35 @@
                                                  (r e z)
                                                  (r e z a)))
 
+(define (tailrec-is-graph-complete initial-graph graph all-nodes nodes-so-far unused-edges)
+  (if (null? graph)
+      (if (null? unused-edges)
+          (set=? (all-nodes) (nodes-so-far))
+          (if (set-empty? (set-intersect (graph->node-set unused-edges) nodes-so-far))
+              #false
+              (tailrec-is-graph-complete nodes-so-far nodes-so-far all-nodes nodes-so-far '())))
+      (cond ((set-member? (graph-first-node graph) nodes-so-far)
+             (tailrec-is-graph-complete
+              initial-graph
+              (cdr graph)
+              all-nodes
+              (set-add nodes-so-far graph-second-node graph)
+              unused-edges))
+            ((set-member? (graph-second-node graph) nodes-so-far)
+             (tailrec-is-graph-complete
+              initial-graph
+              (cdr graph)
+              all-nodes
+              (set-add nodes-so-far graph-first-node graph)
+              unused-edges))
+            (else
+             (tailrec-is-graph-complete
+              initial-graph
+              (cdr graph)
+              all-nodes
+              nodes-so-far
+              (cons (car graph) unused-edges))))))
+
 (define (graphs1 l)
   (tailrec-parts '(()) (tailrec-couples '() l)))
 
