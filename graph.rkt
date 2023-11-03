@@ -25,10 +25,11 @@
                (cdr l)))
          (cdr l))))
 
-(check-equal? (tailrec-couples '() '(a z e r)) '((a z) (a e) (a r) (z e) (z r) (e r)) "tailrec-couples")
-(check-equal? (tailrec-couples '() '(a e r z)) '((a e) (a r) (a z) (e r) (e z) (r z)) "tailrec-couples")
+(check-equal? (tailrec-couples '() '(a z e r))
+              '((a z) (a e) (a r) (z e) (z r) (e r)) "tailrec-couples")
+(check-equal? (tailrec-couples '() '(a e r z))
+              '((a e) (a r) (a z) (e r) (e z) (r z)) "tailrec-couples")
 
-; outputs sorted couples provided the list l given as argument is sorted first.
 (define (tailrec-sorted-couples res l less-than?)
     (if (null? l)
         res
@@ -40,8 +41,10 @@
          (cdr l)
          less-than?)))
 
-(check-equal? (tailrec-sorted-couples '() '(a z e r) symbol<?) '((a z) (a e) (a r) (e z) (r z) (e r)) "tailrec-sorted-couples")
-(check-equal? (tailrec-sorted-couples '() '(a e r z) symbol<?) '((a e) (a r) (a z) (e r) (e z) (r z)) "tailrec-sorted-couples")
+(check-equal? (tailrec-sorted-couples '() '(a z e r) symbol<?)
+              '((a z) (a e) (a r) (e z) (r z) (e r)) "tailrec-sorted-couples")
+(check-equal? (tailrec-sorted-couples '() '(a e r z) symbol<?)
+              '((a e) (a r) (a z) (e r) (e z) (r z)) "tailrec-sorted-couples")
 
 (define (tailrec res l update-res)
     (if (null? l)
@@ -110,34 +113,12 @@
                                                  (r e z)
                                                  (r e z a)))
 
-(define (tailrec-is-graph-complete initial-graph graph all-nodes nodes-so-far unused-edges)
-  (if (null? graph)
-      (if (null? unused-edges)
-          (set=? (all-nodes) (nodes-so-far))
-          (if (set-empty? (set-intersect (graph->node-set unused-edges) nodes-so-far))
-              #false
-              (tailrec-is-graph-complete nodes-so-far nodes-so-far all-nodes nodes-so-far '())))
-      (cond ((set-member? (graph-first-node graph) nodes-so-far)
-             (tailrec-is-graph-complete
-              initial-graph
-              (cdr graph)
-              all-nodes
-              (set-add nodes-so-far graph-second-node graph)
-              unused-edges))
-            ((set-member? (graph-second-node graph) nodes-so-far)
-             (tailrec-is-graph-complete
-              initial-graph
-              (cdr graph)
-              all-nodes
-              (set-add nodes-so-far graph-first-node graph)
-              unused-edges))
-            (else
-             (tailrec-is-graph-complete
-              initial-graph
-              (cdr graph)
-              all-nodes
-              nodes-so-far
-              (cons (car graph) unused-edges))))))
+(define (graph-first-node g)
+  (caar g))
+
+; second node of first edge of g
+(define (graph-second-node g)
+  (cadar g))
 
 (define (graphs1 l)
   (tailrec-parts '(()) (tailrec-couples '() l)))
@@ -149,12 +130,68 @@
 (define (contains-deep? l x)
   (member x (flatten l)))
 
-; does the graph g contain all nodes listed in l?
 (define (contains-all? g l)
   (cond ((null? l) true)
         ((null? g) false)
-        (else (contains-all? (cdr g) (filter (λ(s) (not (or (equal? s (caar g)) (equal? s (cadar g))))) l)))))
-               
+        (else (contains-all?
+               (cdr g)
+               (filter (λ(s) (not (or (equal? s (graph-first-node g))
+                                      (equal? s (graph-second-node g))))) l)))))
+
+(define (tailrec-graph->node-set graph nodes-set)
+  (if (null? graph)
+      nodes-set
+      (tailrec-graph->node-set
+       (cdr graph)
+       (set-add (set-add nodes-set (graph-first-node graph)) (graph-second-node graph)))))
+
+(define (graph->node-set graph)
+  (tailrec-graph->node-set graph (set)))
+
+(define (tailrec-is-graph-complete? initial-graph graph all-nodes-set nodes-so-far-set unused-edges)
+  (if (null? graph)
+      (if (null? unused-edges)
+          (set=? all-nodes-set nodes-so-far-set)
+          (if (set-empty? (set-intersect (graph->node-set unused-edges) nodes-so-far-set))
+              #false
+              (tailrec-is-graph-complete? initial-graph unused-edges all-nodes-set nodes-so-far-set '())))
+      (cond ((set-member? nodes-so-far-set (graph-first-node graph))
+             (tailrec-is-graph-complete?
+              initial-graph
+              (cdr graph)
+              all-nodes-set
+              (set-add nodes-so-far-set (graph-second-node graph))
+              unused-edges))
+            ((set-member? nodes-so-far-set (graph-second-node graph))
+             (tailrec-is-graph-complete?
+              initial-graph
+              (cdr graph)
+              all-nodes-set
+              (set-add nodes-so-far-set (graph-first-node graph))
+              unused-edges))
+            (else
+             (tailrec-is-graph-complete?
+              initial-graph
+              (cdr graph)
+              all-nodes-set
+              nodes-so-far-set
+              (cons (car graph) unused-edges))))))
+
+(check-true (tailrec-is-graph-complete? '((a b) (c d) (a c))
+                                       '((a b) (c d) (a c))
+                                       (set 'a 'b 'c 'd)
+                                       (set 'a)
+                                       '()))
+(check-true (tailrec-is-graph-complete? '((a b) (a d) (a c))
+                                       '((a b) (a d) (a c))
+                                       (set 'a 'b 'c 'd)
+                                       (set 'a)
+                                       '()))
+(check-false (tailrec-is-graph-complete? '((a b) (c d)) '((a b) (c d)) (set 'a 'b 'c 'd) (set 'a) '()))
+(check-true (tailrec-is-graph-complete? '((a b) (b c)) '((a b) (b c)) (set 'a 'b 'c) (set 'a) '()))
+(check-true (tailrec-is-graph-complete? '((a b) (a c)) '((a b) (a c)) (set 'a 'b 'c) (set 'a) '()))
+(check-true (tailrec-is-graph-complete? '((a b)) '((a b)) (set 'a 'b) (set 'a) '()))
+(check-true (tailrec-is-graph-complete? '() '() (set) (set) '()))
 
 (define (graphs1_1 l)
   (filter (λ(g) (contains-all? g l)) (graphs1 l)))
