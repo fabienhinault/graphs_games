@@ -147,51 +147,47 @@
 
 (define (graph->node-set graph)
   (tailrec-graph->node-set graph (set)))
-
-(define (tailrec-is-graph-complete? initial-graph graph all-nodes-set nodes-so-far-set unused-edges)
+(define (tailrec-is-graph-complete? graph all-nodes-set nodes-so-far-set unused-edges)
   (if (null? graph)
       (if (null? unused-edges)
           (set=? all-nodes-set nodes-so-far-set)
           (if (set-empty? (set-intersect (graph->node-set unused-edges) nodes-so-far-set))
               #false
-              (tailrec-is-graph-complete? initial-graph unused-edges all-nodes-set nodes-so-far-set '())))
+              (tailrec-is-graph-complete? unused-edges all-nodes-set nodes-so-far-set '())))
       (cond ((set-member? nodes-so-far-set (graph-first-node graph))
              (tailrec-is-graph-complete?
-              initial-graph
               (cdr graph)
               all-nodes-set
               (set-add nodes-so-far-set (graph-second-node graph))
               unused-edges))
             ((set-member? nodes-so-far-set (graph-second-node graph))
              (tailrec-is-graph-complete?
-              initial-graph
               (cdr graph)
               all-nodes-set
               (set-add nodes-so-far-set (graph-first-node graph))
               unused-edges))
             (else
              (tailrec-is-graph-complete?
-              initial-graph
               (cdr graph)
               all-nodes-set
               nodes-so-far-set
               (cons (car graph) unused-edges))))))
 
 (check-true (tailrec-is-graph-complete? '((a b) (c d) (a c))
-                                       '((a b) (c d) (a c))
-                                       (set 'a 'b 'c 'd)
-                                       (set 'a)
-                                       '()))
+                                        (set 'a 'b 'c 'd)
+                                        (set 'a)
+                                        '()))
 (check-true (tailrec-is-graph-complete? '((a b) (a d) (a c))
-                                       '((a b) (a d) (a c))
-                                       (set 'a 'b 'c 'd)
-                                       (set 'a)
-                                       '()))
-(check-false (tailrec-is-graph-complete? '((a b) (c d)) '((a b) (c d)) (set 'a 'b 'c 'd) (set 'a) '()))
-(check-true (tailrec-is-graph-complete? '((a b) (b c)) '((a b) (b c)) (set 'a 'b 'c) (set 'a) '()))
-(check-true (tailrec-is-graph-complete? '((a b) (a c)) '((a b) (a c)) (set 'a 'b 'c) (set 'a) '()))
-(check-true (tailrec-is-graph-complete? '((a b)) '((a b)) (set 'a 'b) (set 'a) '()))
-(check-true (tailrec-is-graph-complete? '() '() (set) (set) '()))
+                                        (set 'a 'b 'c 'd)
+                                        (set 'a)
+                                        '()))
+(check-false (tailrec-is-graph-complete? '((a b) (c d)) (set 'a 'b 'c 'd) (set 'a) '()))
+(check-false (tailrec-is-graph-complete? '((c d)) (set 'a 'b 'c 'd) (set 'a ' b) '()))
+(check-false (tailrec-is-graph-complete? '() (set 'a 'b 'c 'd) (set 'a ' b) '((c d))))
+(check-true (tailrec-is-graph-complete? '((a b) (b c)) (set 'a 'b 'c) (set 'a) '()))
+(check-true (tailrec-is-graph-complete? '((a b) (a c)) (set 'a 'b 'c) (set 'a) '()))
+(check-true (tailrec-is-graph-complete? '((a b)) (set 'a 'b) (set 'a) '()))
+(check-true (tailrec-is-graph-complete? '() (set) (set) '()))
 
 (define (graphs1_1 l)
   (filter (λ(g) (contains-all? g l)) (graphs1 l)))
