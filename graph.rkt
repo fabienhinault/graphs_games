@@ -183,9 +183,9 @@
                                         (set 'a 'b 'c 'd)
                                         (set 'a)
                                         '()))
-(check-equal? '(c b) (tailrec-is-graph-complete? '((a b) (c d)) (set 'a 'b 'c 'd) (set 'a) '()))
-(check-equal? '(c b) (tailrec-is-graph-complete? '((c d)) (set 'a 'b 'c 'd) (set 'a ' b) '()))
-(check-equal? '(c b) (tailrec-is-graph-complete? '() (set 'a 'b 'c 'd) (set 'a ' b) '((c d))))
+(check-equal? '(c a) (tailrec-is-graph-complete? '((a b) (c d)) (set 'a 'b 'c 'd) (set 'a) '()))
+(check-equal? '(c a) (tailrec-is-graph-complete? '((c d)) (set 'a 'b 'c 'd) (set 'a ' b) '()))
+(check-equal? '(c a) (tailrec-is-graph-complete? '() (set 'a 'b 'c 'd) (set 'a ' b) '((c d))))
 (check-true (tailrec-is-graph-complete? '((a b) (b c)) (set 'a 'b 'c) (set 'a) '()))
 (check-true (tailrec-is-graph-complete? '((a b) (a c)) (set 'a 'b 'c) (set 'a) '()))
 (check-true (tailrec-is-graph-complete? '((a b)) (set 'a 'b) (set 'a) '()))
@@ -197,7 +197,7 @@
         g
         (rec-complete-graph (cons complete g) nodes-set))))
 
-(check-equal? (rec-complete-graph '((a b) (c d)) set-abcd) '((c b) (a b) (c d)))
+(check-equal? (rec-complete-graph '((a b) (c d)) set-abcd) '((c a) (a b) (c d)))
 
 (define (graphs1_1 l)
   (filter (λ(g) (contains-all? g l)) (graphs1 l)))
@@ -223,7 +223,8 @@
          (cdr l)
          less-than?)))
 
-(check-equal? (tailrec-sorted-parts '(()) '(a z e) symbol<?) '(() (a) (z) (a z) (e) (a e) (e z) (a e z)))
+(check-equal? (tailrec-sorted-parts '(()) '(a z e) symbol<?)
+              '(() (a) (z) (a z) (e) (a e) (e z) (a e z)))
 
 (define (edge<? edge1 edge2)
   (let ((car1 (car edge1))
@@ -393,11 +394,27 @@
   (build-list nb-edges (λ(_) (random-edge l))))
 
 (define (symbols n)
-   (map (λ(_) (string->symbol
-               (string
-                (integer->char
-                 (+ _ (char->integer #\a))))))
-        (range n)))
+  (map string->symbol (map ~a (range n))))
 
-(check-equal? (symbols 3) '(a b c))
+(check-equal? (symbols 3) '(|0| |1| |2|))
 
+(define (new-edgess n)
+  (let* ((new-node (string->symbol(~a (- n 1))))
+         (old-nodes (symbols (- n 1)))
+         (new-edges (map (λ (_) (list _ new-node)) old-nodes)))
+    (sort (tailrec-sorted-parts '(()) new-edges edge<?) graph<?)))
+
+(check-equal? (new-edgess 0) '(()))
+(check-equal? (new-edgess 1) '(()))
+(check-equal? (new-edgess 2) '(() ((|0| |1|))))
+(check-equal? (new-edgess 3) '(() ((|0| |2|)) ((|1| |2|)) ((|0| |2|) (|1| |2|))))
+(check-equal? (new-edgess 4)
+              '(() ((|0| |3|)) ((|1| |3|)) ((|2| |3|))
+                   ((|0| |3|) (|1| |3|)) ((|0| |3|) (|2| |3|)) ((|1| |3|) (|2| |3|))
+                   ((|0| |3|) (|1| |3|) (|2| |3|))))
+
+(define (new-graphs old-graph new-edgess)
+  (map (λ (_) (append old-graph _) new-edgess)))
+
+(define (graphs4 nb-nodes graphs-n-1)
+  '())
