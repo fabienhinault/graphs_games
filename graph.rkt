@@ -266,10 +266,14 @@
  (graphs2 '(a e z))
 '(() ((a e)) ((a z)) ((e z)) ((a e) (a z)) ((a e) (e z)) ((a z) (e z)) ((a e) (a z) (e z))))
 
+(define (deep f l)
+    (cond ((null? l) '())
+          ((pair? l) (cons (deep f (car l)) (deep f (cdr l))))
+          (else (f l))))
+
 (define (replace-all-deep old new l)
-    (cond ((null? l)
-        '())
-          ((equal? l old) new)
+  (cond ((null? l) '())
+        ((equal? l old) new)
         ((pair? l) (cons (replace-all-deep old new (car l)) (replace-all-deep old new (cdr l))))
         (else l)))
 
@@ -306,9 +310,19 @@
 (check-topo-graph2 '(j k l) '((a z) (e z)) '(a z e) '((j k) (l k)))
 (check-topo-graph2 '(j k l) '((a e) (a z) (e z)) '(a e z) '((j k) (j l) (k l)))
 
+; https://github.com/arclanguage/anarki/blob/master/arc.arc#L1844
+(define (memo f)
+  (let ((cache (make-hash)))
+    (λ args
+      (hash-ref cache args
+                (λ ()
+                  (let ((result (apply f args)))
+                    (hash-set! cache args result)
+                    result))))))
+                  
 
-(define (get-degree symbol graph)
-  (length (filter (λ (edge) (member symbol edge)) graph)))
+(define get-degree (memo (λ (symbol graph)
+  (length (filter (λ (edge) (member symbol edge)) graph)))))
 
 (check-equal? (get-degree 'a '((a z) (a e))) 2)
 (check-equal? (get-degree 'z '((a z) (a e))) 1)
@@ -354,12 +368,25 @@
   (check-true  (e<? '(e a) '(z a))))
   
 
-(define (edge-compare graph)
+(define (edge-compare* graph)
   (let ((vertice-compare (vertice-compare* graph)))
     (λ (e1 e2)
       (refine-compare
        (vertice-compare (car e1) (car e2))
        (vertice-compare (cadr e1) (cadr e2))))))
+
+(define (rewrite-graph graph)
+  (define degrees (make-hash))
+  (deep (λ (_) (hash-set! degrees _ (get-degree _ graph))) graph)
+  (define (vertice-compare v1 v2)
+    (refine-compare
+     (integer-compare (hash-ref degrees v1) (hash-ref degrees v2))
+     (symbol-compare v1 v2)))
+  degrees
+  (map (λ (_) (sort _ vertice-compare)) graph)
+;  (sort (map (λ (_) (sort _ vertice-compare)) graph) (edge-compare* graph))
+  )
+  
 
 (define (graphs3 l)
   (sort (tailrec-sorted-parts '(()) (tailrec-sorted-couples '() l symbol<?) edge<?) graph<?))
