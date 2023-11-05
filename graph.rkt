@@ -383,20 +383,28 @@
   (check-false (v<? 'a 'e)))
 
 ; the vertices are supposed to be sorted in the edge
-(define (edge<?* graph)
-  (let ((vertice-compare (vertice-compare* graph)))
+(define (edge<?* graph vertice-compare)
     (λ (e1 e2)
       (< (refine-compare
           (vertice-compare (car e1) (car e2))
           (vertice-compare (cadr e1) (cadr e2)))
-         0))))
+         0)))
 
 
 (let* ((G '((a z) (a e)))
-       (e<? (edge<?* G)))
+       (e<? (edge<?* G (vertice-compare* G))))
   (check-false (e<? '(z a) '(e a)))
   (check-false (e<? '(z a) '(e a)))
   (check-true  (e<? '(e a) '(z a))))
+  
+(let* ((G '((|0| |1|) (|0| |2|) (|1| |4|) (|3| |2|) (|3| |4|) (|2| |4|)))
+       ; degrees:  0:2  1:2  2:3  3:2  4:3 
+       (e<? (edge<?* G (vertice-compare* G))))
+  (check-true  (e<? '(|0| |1|) '(|0| |2|)))
+  (check-true  (e<? '(|0| |2|) '(|1| |4|)))
+  (check-true  (e<? '(|1| |4|) '(|3| |2|)))
+  (check-true  (e<? '(|3| |2|) '(|3| |4|)))
+  (check-true  (e<? '(|3| |4|) '(|2| |4|))))
   
 
 (define (edge-compare* graph)
@@ -409,13 +417,14 @@
 (define (rewrite-graph graph)
   (define degrees (make-hash))
   (deep (λ (_) (hash-set! degrees _ (get-degree _ graph))) graph)
-  (define (vertice<? v1 v2)
-    (< (refine-compare
+  (define (vertice-compare v1 v2)
+    (refine-compare
         (integer-compare (hash-ref degrees v1) (hash-ref degrees v2))
-        (symbol-compare v1 v2))
-       0))
+        (symbol-compare v1 v2)))
+  (define (vertice<? v1 v2) (< (vertice-compare v1 v2)
+                               0))
   degrees
-  (sort (map (λ (_) (sort _ vertice<?)) graph) (edge<?* graph)))
+  (sort (map (λ (_) (sort _ vertice<?)) graph) (edge<?* graph vertice-compare)))
   
 
 (define (graphs3 l)
@@ -439,8 +448,8 @@
 (define (graph-name g)
   (~a (apply string-append (map symbol->string (flatten g))) ".dot"))
 
-(define (write-dot-file g)
-  (with-output-to-file (graph-name g)
+(define (write-dot-file g n)
+  (with-output-to-file (~a n "/" (graph-name g))
     (λ() (printf (graph-dot g)))))
 
 (define (random-edge l)
@@ -497,3 +506,15 @@
                 ((|0| |1|) (|0| |2|) (|1| |3|) (|2| |3|))
                 ((|0| |1|) (|0| |2|) (|3| |1|) (|3| |2|) (|1| |2|))
                 ((|0| |1|) (|0| |2|) (|0| |3|) (|1| |2|) (|1| |3|) (|2| |3|))))
+
+(define (has-vertex-degree-1 graph)
+  (member 1 (flatten (deep (λ (_) (get-degree _ graph)) graph))))
+
+(define (has-no-vertex-degree-1 graph)
+  (not (has-vertex-degree-1 graph)))
+
+(check-equal? (has-vertex-degree-1 '((|0| |1|) (|2| |3|) (|1| |3|))) '(1 2 1 2 2 2))
+(check-false
+ (has-vertex-degree-1 '((|0| |1|) (|0| |2|) (|0| |3|) (|1| |2|) (|1| |3|) (|2| |3|))))
+ 
+
