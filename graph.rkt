@@ -518,3 +518,6 @@
  (has-vertex-degree-1 '((|0| |1|) (|0| |2|) (|0| |3|) (|1| |2|) (|1| |3|) (|2| |3|))))
  
 
+;(for-each
+;   (lambda (_) (write-dot-file _ 6))
+;   (filter has-no-vertex-degree-1 _6))
