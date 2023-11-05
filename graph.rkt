@@ -283,6 +283,37 @@
 (check-equal? (replace-all-deep 'a 'b 'z) 'z)
 (check-equal? (replace-all-deep 'a 'b '((a z) (e r))) '((b z) (e r)))
 
+(define (rec-rename-graph-vertices graph node-renamings new-names)
+  (if (null? graph)
+      '()
+      (let ((edge (car graph)))
+        (cons (rename-edge-vertices edge node-renamings new-names)
+              (rec-rename-graph-vertices (cdr graph) node-renamings new-names)))))
+
+(define (rename-edge-vertices edge node-renamings new-names)
+  (map (λ (vertex) (rename-vertex vertex node-renamings new-names))
+       edge))
+
+(define (rename-vertex vertex node-renamings new-names)
+  (let ((renaming (hash-ref node-renamings vertex false)))
+    (if renaming
+        renaming
+        (let ((new-name (new-names)))
+          (hash-set! node-renamings vertex new-name)
+          new-name))))
+
+(define (new-name-numeric-generator)
+  (let ((count 0))
+    (λ () (begin0
+            (string->symbol (~a count))
+            (set! count (+ 1 count))))))
+
+(define (new-name-alphabetic-generator)
+  (let ((count 0))
+    (λ () (begin0
+            (string->symbol (~a (integer->char (+ count (char->integer #\a)))))
+            (set! count (+ 1 count))))))
+
 (define (topo-graphs2 l)
     (let ((syms (map (λ (_) (gensym)) (range (length l)))))
       (map
@@ -355,10 +386,10 @@
 (define (edge<?* graph)
   (let ((vertice-compare (vertice-compare* graph)))
     (λ (e1 e2)
-      (> 0
-         (refine-compare
+      (< (refine-compare
           (vertice-compare (car e1) (car e2))
-          (vertice-compare (cadr e1) (cadr e2)))))))
+          (vertice-compare (cadr e1) (cadr e2)))
+         0))))
 
 
 (let* ((G '((a z) (a e)))
@@ -378,14 +409,13 @@
 (define (rewrite-graph graph)
   (define degrees (make-hash))
   (deep (λ (_) (hash-set! degrees _ (get-degree _ graph))) graph)
-  (define (vertice-compare v1 v2)
-    (refine-compare
-     (integer-compare (hash-ref degrees v1) (hash-ref degrees v2))
-     (symbol-compare v1 v2)))
+  (define (vertice<? v1 v2)
+    (< (refine-compare
+        (integer-compare (hash-ref degrees v1) (hash-ref degrees v2))
+        (symbol-compare v1 v2))
+       0))
   degrees
-  (map (λ (_) (sort _ vertice-compare)) graph)
-;  (sort (map (λ (_) (sort _ vertice-compare)) graph) (edge-compare* graph))
-  )
+  (sort (map (λ (_) (sort _ vertice<?)) graph) (edge<?* graph)))
   
 
 (define (graphs3 l)
@@ -425,23 +455,45 @@
 
 (check-equal? (symbols 3) '(|0| |1| |2|))
 
-(define (new-edgess n)
+(define (get-new-edgess n)
   (let* ((new-node (string->symbol(~a (- n 1))))
          (old-nodes (symbols (- n 1)))
          (new-edges (map (λ (_) (list _ new-node)) old-nodes)))
-    (sort (tailrec-sorted-parts '(()) new-edges edge<?) graph<?)))
+    ; remove '() at start
+    (cdr (tailrec-parts '(()) new-edges))))
 
-(check-equal? (new-edgess 0) '(()))
-(check-equal? (new-edgess 1) '(()))
-(check-equal? (new-edgess 2) '(() ((|0| |1|))))
-(check-equal? (new-edgess 3) '(() ((|0| |2|)) ((|1| |2|)) ((|0| |2|) (|1| |2|))))
-(check-equal? (new-edgess 4)
-              '(() ((|0| |3|)) ((|1| |3|)) ((|2| |3|))
-                   ((|0| |3|) (|1| |3|)) ((|0| |3|) (|2| |3|)) ((|1| |3|) (|2| |3|))
-                   ((|0| |3|) (|1| |3|) (|2| |3|))))
+(check-equal? (get-new-edgess 0) '())
+(check-equal? (get-new-edgess 1) '())
+(check-equal? (get-new-edgess 2) '(((|0| |1|))))
+(check-equal? (get-new-edgess 3) '(((|0| |2|)) ((|1| |2|)) ((|1| |2|) (|0| |2|))))
+(check-equal? (get-new-edgess 4)
+              '(((|0| |3|)) ((|1| |3|))
+                            ((|1| |3|) (|0| |3|)) 
+                            ((|2| |3|))
+                            ((|2| |3|) (|0| |3|)) ((|2| |3|) (|1| |3|))
+                            ((|2| |3|) (|1| |3|) (|0| |3|))))
 
 (define (new-graphs old-graph new-edgess)
-  (map (λ (_) (append old-graph _) new-edgess)))
+  ; need to rewrite twice to reorder vertices in edges after rename
+  (map rewrite-graph
+       (map
+        (λ (_) (rec-rename-graph-vertices _ (make-hash) (new-name-numeric-generator)))
+        (map rewrite-graph (map (λ (_) (append old-graph _)) new-edgess)))))
 
-(define (graphs4 nb-nodes graphs-n-1)
-  '())
+(check-equal? (new-graphs '() (get-new-edgess 2)) '(((|0| |1|))))
+
+
+(define (graphs4 nb-vertices graphs-n-1)
+  (let ((new-edges (get-new-edgess nb-vertices)))
+    (remove-duplicates (apply append (map (λ (_) (new-graphs _ new-edges)) graphs-n-1)))))
+
+(check-equal? (graphs4 2 '(())) '(((|0| |1|))))
+(check-equal? (graphs4 3 '(((|0| |1|))))
+              '(((|0| |1|) (|2| |1|)) ((|0| |1|) (|0| |2|) (|1| |2|))))
+(check-equal? (graphs4 4 '(((|0| |1|) (|2| |1|)) ((|0| |1|) (|0| |2|) (|1| |2|))))
+              '(((|0| |1|) (|2| |3|) (|1| |3|))
+                ((|0| |1|) (|2| |1|) (|3| |1|))
+                ((|0| |1|) (|2| |3|) (|2| |1|) (|3| |1|))
+                ((|0| |1|) (|0| |2|) (|1| |3|) (|2| |3|))
+                ((|0| |1|) (|0| |2|) (|3| |1|) (|3| |2|) (|1| |2|))
+                ((|0| |1|) (|0| |2|) (|0| |3|) (|1| |2|) (|1| |3|) (|2| |3|))))
