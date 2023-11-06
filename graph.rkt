@@ -491,6 +491,17 @@
 
 (check-equal? (new-graphs '() (get-new-edgess 2)) '(((|0| |1|))))
 
+(define (new-graph old-graph new-edges)
+  ; need to rewrite twice to reorder vertices in edges after rename
+  (rewrite-graph
+   (rec-rename-graph-vertices (rewrite-graph (append old-graph new-edges))
+                              (make-hash) (new-name-numeric-generator))))
+
+
+;                          (|1| |0|) (|3| |2|) (|0| |2|)    (|1| |4|) (|2| |4|) (|3| |4|)
+(check-equal? (new-graph '((|0| |1|) (|2| |3|) (|1| |3|)) '((|0| |4|) (|2| |4|) (|3| |4|)))
+              '((|0| |1|) (|0| |2|) (|1| |3|) (|4| |2|) (|4| |3|) (|2| |3|)))
+
 
 (define (graphs4 nb-vertices graphs-n-1)
   (let ((new-edges (get-new-edgess nb-vertices)))
