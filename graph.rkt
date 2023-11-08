@@ -389,15 +389,25 @@
   (check-true (v<? 'e 'z))
   (check-false (v<? 'a 'e)))
 
+(define (edge-degree-compare* get-vertex-degree)
+  (λ (e1 e2)
+    (refine-compare
+        (integer-compare (get-vertex-degree (car e1)) (get-vertex-degree (car e2)))
+        (integer-compare (get-vertex-degree (cadr e1)) (get-vertex-degree (cadr e2))))))
+
+(define (edge-symbol-compare e1 e2)
+  (refine-compare
+   (symbol-compare (car e1) (car e2))
+   (symbol-compare (cadr e1) (cadr e2))))
+
 ; the vertices are supposed to be sorted in the edge
-(define (edge<?* graph get-vertex-degree)
+(define (edge<?* get-vertex-degree)
+  (let ((edge-degree-compare (edge-degree-compare* get-vertex-degree)))
     (λ (e1 e2)
       (< (refine-compare
-          (integer-compare (get-vertex-degree (car e1)) (get-vertex-degree (car e2)))
-          (integer-compare (get-vertex-degree (cadr e1)) (get-vertex-degree (cadr e2)))
-          (symbol-compare (car e1) (car e2))
-          (symbol-compare (cadr e1) (cadr e2)))
-         0)))
+          (edge-degree-compare e1 e2)
+          (edge-symbol-compare e1 e2))
+         0))))
 
 (let* ((degrees (make-hash))
        (get-v-degree (λ (_) (hash-ref degrees _)))
@@ -412,17 +422,17 @@
   (check-equal? (map (λ (_) (sort _ vertice<?)) graph)
                 '((|0| |1|) (|2| |3|) (|3| |1|) (|0| |4|) (|1| |4|) (|2| |4|)))
   (check-equal? (get-v-degree '|2|) 2)
-  (check-true ((edge<?* graph get-v-degree) '(|2| |3|) '(|0| |4|))))
+  (check-true ((edge<?* get-v-degree) '(|2| |3|) '(|0| |4|))))
 
 (let* ((G '((a z) (a e)))
-       (e<? (edge<?* G (λ (_) (get-degree _ G)))))
+       (e<? (edge<?* (λ (_) (get-degree _ G)))))
   (check-false (e<? '(z a) '(e a)))
   (check-false (e<? '(z a) '(e a)))
   (check-true  (e<? '(e a) '(z a))))
   
 (let* ((G '((|0| |1|) (|0| |2|) (|1| |4|) (|3| |2|) (|3| |4|) (|2| |4|)))
        ; degrees:  0:2  1:2  2:3  3:2  4:3 
-       (e<? (edge<?* G (λ (_) (get-degree _ G)))))
+       (e<? (edge<?* (λ (_) (get-degree _ G)))))
   (check-true  (e<? '(|0| |1|) '(|0| |2|)))
   (check-true  (e<? '(|0| |2|) '(|1| |4|)))
   (check-true  (e<? '(|1| |4|) '(|3| |2|)))
@@ -448,7 +458,7 @@
         (symbol-compare v1 v2)))
   (define (vertice<? v1 v2) (< (vertice-compare v1 v2)
                                0))
-  (sort (map (λ (_) (sort _ vertice<?)) graph) (edge<?* graph (λ (_) (hash-ref degrees _)))))
+  (sort (map (λ (_) (sort _ vertice<?)) graph) (edge<?* (λ (_) (hash-ref degrees _)))))
   
 (check-equal?
  (get-graph-degrees (rewrite-graph '((|0| |1|) (|2| |3|) (|1| |3|) (|0| |4|) (|1| |4|) (|2| |4|))))
