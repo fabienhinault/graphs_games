@@ -575,6 +575,12 @@
 (check-false
  (has-vertex-degree-1 '((|0| |1|) (|0| |2|) (|0| |3|) (|1| |2|) (|1| |3|) (|2| |3|))))
  
+(define graphs-by-node-nb (make-vector 100))
+(vector-set! graphs-by-node-nb 1 '(()))
+(for ((i-node-nb (range 2 6)))
+  (vector-set! graphs-by-node-nb i-node-nb
+                 (graphs4 i-node-nb (vector-ref graphs-by-node-nb (- i-node-nb 1)))))
+
 
 ;(for-each
 ;   (lambda (_) (write-dot-file _ 6))
