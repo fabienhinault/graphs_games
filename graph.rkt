@@ -285,6 +285,87 @@
 (check-equal? (replace-all-deep 'a 'b 'z) 'z)
 (check-equal? (replace-all-deep 'a 'b '((a z) (e r))) '((b z) (e r)))
 
+; https://github.com/arclanguage/anarki/blob/master/arc.arc#L1844
+(define (memo f)
+  (let ((cache (make-hash)))
+    (λ args
+      (hash-ref cache args
+                (λ ()
+                  (let ((result (apply f args)))
+                    (hash-set! cache args result)
+                    result))))))
+                  
+
+(define get-degree (memo (λ (symbol graph)
+  (length (filter (λ (edge) (member symbol edge)) graph)))))
+
+(check-equal? (get-degree 'a '((a z) (a e))) 2)
+(check-equal? (get-degree 'z '((a z) (a e))) 1)
+(check-equal? (get-degree 'e '((a z) (a e))) 1)
+
+(define (new-name-numeric-generator)
+  (let ((count 0))
+    (λ () (begin0
+            (string->symbol (~a count))
+            (set! count (+ 1 count))))))
+
+(define (new-name-alphabetic-generator)
+  (let ((count 0))
+    (λ () (begin0
+            (string->symbol (~a (integer->char (+ count (char->integer #\a)))))
+            (set! count (+ 1 count))))))
+
+; auxiliary function for get-graph-nodes-by-degrees
+(define (add-node-by-degree acc v degree)
+  (let ((all-nodes (vector-ref acc 0))
+        (deg-nodes (vector-ref acc degree)))
+    (when (not (member v all-nodes))
+      (let ((new-all (cons v all-nodes))
+            (new-deg (cons v deg-nodes)))
+        (vector-set! acc 0 new-all)
+        (vector-set! acc degree new-deg)))
+    acc))
+
+(check-equal? (add-node-by-degree (make-vector 6 '()) 'a 3)
+              '#((a) () () (a) () ()))
+
+; auxiliary function for get-graph-nodes-by-degrees
+(define (add-edge-nodes-by-degrees* graph)
+  (λ (edge acc)
+    (let* ((v1 (car edge))
+           (deg1 (get-degree v1 graph))
+           (v2 (cadr edge))
+           (deg2 (get-degree v2 graph)))
+      (add-node-by-degree (add-node-by-degree acc v1 deg1) v2 deg2))))
+
+(check-equal? ((add-edge-nodes-by-degrees* '((a b))) '(a b) (make-vector 2 '()))
+              '#((b a) (b a)))
+
+(let ((add-edge-nodes-by-degrees (add-edge-nodes-by-degrees* '((a b) (a c))))
+      (acc (make-vector 3 '())))
+  (check-equal? (add-edge-nodes-by-degrees '(a b) acc)
+                '#((b a) (b) (a)))
+  (check-equal? acc '#((b a) (b) (a)))
+  (check-equal? (add-edge-nodes-by-degrees '(a c) acc)
+                '#((c b a) (c b) (a)))
+  )
+  
+
+
+(define (get-graph-nodes-by-degrees graph nb-vertices)
+  (vector-map reverse
+              (foldl (add-edge-nodes-by-degrees* graph)
+                     (make-vector nb-vertices '())
+                     graph)))
+
+(check-equal? (get-graph-nodes-by-degrees '((a b) (a c)) 3)
+              '#((a b c) (b c) (a)))
+ 
+        
+        
+
+; node-renamings: a hash map linking old vertices names to new ones
+; new-names: a function returning a new unused name each time it is called
 (define (rec-rename-graph-vertices graph node-renamings new-names)
   (if (null? graph)
       '()
@@ -304,17 +385,17 @@
           (hash-set! node-renamings vertex new-name)
           new-name))))
 
-(define (new-name-numeric-generator)
-  (let ((count 0))
-    (λ () (begin0
-            (string->symbol (~a count))
-            (set! count (+ 1 count))))))
+(define (get-degree-renaming graph nb-vertices new-names)
+  (let ((vector-graph-nodes-by-degree (get-graph-nodes-by-degrees graph nb-vertices))
+        (node-renamings (make-hash)))
+    (vector-set! vector-graph-nodes-by-degree 0 '())
+    (map (λ (_) (rename-vertex _ node-renamings new-names))
+         (flatten (vector->list vector-graph-nodes-by-degree)))
+    node-renamings))
 
-(define (new-name-alphabetic-generator)
-  (let ((count 0))
-    (λ () (begin0
-            (string->symbol (~a (integer->char (+ count (char->integer #\a)))))
-            (set! count (+ 1 count))))))
+(check-equal? (hash->list (get-degree-renaming '((a b) (a c)) 3 (new-name-alphabetic-generator)))
+              '((a . c) (b . a) (c . b)))
+
 
 (define (topo-graphs2 l)
     (let ((syms (map (λ (_) (gensym)) (range (length l)))))
@@ -324,10 +405,9 @@
            (foldl replace-all-deep graph uniqs (take l (length uniqs)))))
        (graphs2 syms))))
 
-(check-equal? (topo-graphs2 '(a e z))
-              '(() ((a e)) ((a e)) ((a e)) ((a e) (a z)) ((a e) (e z)) ((a e) (z e)) ((a e) (a z) (e z))))
-
-;'(() ((a e)) ((a z)) ((e z)) ((a e) (a z)) ((a e) (e z)) ((a z) (e z)) ((a e) (a z) (e z))))
+(check-equal?
+ (topo-graphs2 '(a e z))
+ '(() ((a e)) ((a e)) ((a e)) ((a e) (a z)) ((a e) (e z)) ((a e) (z e)) ((a e) (a z) (e z))))
 
 (define (check-topo-graph2 l graph expected-uniqs expected-tgraph)
   (let* ((uniqs (remove-duplicates (flatten graph)))
@@ -342,24 +422,6 @@
 (check-topo-graph2 '(j k l) '((a e) (e z)) '(a e z) '((j k) (k l)))
 (check-topo-graph2 '(j k l) '((a z) (e z)) '(a z e) '((j k) (l k)))
 (check-topo-graph2 '(j k l) '((a e) (a z) (e z)) '(a e z) '((j k) (j l) (k l)))
-
-; https://github.com/arclanguage/anarki/blob/master/arc.arc#L1844
-(define (memo f)
-  (let ((cache (make-hash)))
-    (λ args
-      (hash-ref cache args
-                (λ ()
-                  (let ((result (apply f args)))
-                    (hash-set! cache args result)
-                    result))))))
-                  
-
-(define get-degree (memo (λ (symbol graph)
-  (length (filter (λ (edge) (member symbol edge)) graph)))))
-
-(check-equal? (get-degree 'a '((a z) (a e))) 2)
-(check-equal? (get-degree 'z '((a z) (a e))) 1)
-(check-equal? (get-degree 'e '((a z) (a e))) 1)
 
 (define (get-graph-degrees graph)
   (deep (λ (_) (get-degree _ graph)) graph))
@@ -465,10 +527,30 @@
  '((2 2) (2 3) (2 3) (2 3) (2 3) (3 3)))
 
 (check-equal?
+ (get-graph-degrees (rewrite-graph '((|0| |1|) (|2| |3|) (|1| |3|) (|0| |4|) (|2| |4|) (|3| |4|))))
+ '((2 2) (2 3) (2 3) (2 3) (2 3) (3 3)))
+
+;  2     0
+;  |\   /|
+;  | \ / |
+;  3  4  |
+;   \ | /
+;    \|/
+;     1
+(check-equal?
  (rewrite-graph '((|0| |1|) (|2| |3|) (|1| |3|) (|0| |4|) (|1| |4|) (|2| |4|)))
  '((|2| |3|) (|0| |1|) (|0| |4|) (|2| |4|) (|3| |1|) (|1| |4|)))
 
-
+;  0     2
+;  |\   /|
+;  | \ / |
+;  1  4  |
+;   \ | /
+;    \|/
+;     3
+(check-equal?
+ (rewrite-graph '((|0| |1|) (|2| |3|) (|1| |3|) (|0| |4|) (|2| |4|) (|3| |4|)))
+ '((|0| |1|) (|0| |4|) (|1| |3|) (|2| |3|) (|2| |4|) (|3| |4|)))
 
 (define (graphs3 l)
   (sort (tailrec-sorted-parts '(()) (tailrec-sorted-couples '() l symbol<?) edge<?) graph<?))
@@ -525,14 +607,23 @@
                             ((|2| |3|) (|0| |3|)) ((|2| |3|) (|1| |3|))
                             ((|2| |3|) (|1| |3|) (|0| |3|))))
 
-(define (new-graphs old-graph new-edgess)
+
+; old-graph: a graph of (n - 1) vertices
+; new-edgess: a list of lists of edges, all possibilities to link
+; vertex n with some of the (n - 1) others.
+(define (new-graphs old-graph new-edgess new-nb-vertices)
   ; need to rewrite twice to reorder vertices in edges after rename
   (map rewrite-graph
        (map
-        (λ (_) (rec-rename-graph-vertices _ (make-hash) (new-name-numeric-generator)))
-        (map rewrite-graph (map (λ (_) (append old-graph _)) new-edgess)))))
+        (λ (_)
+          (rec-rename-graph-vertices
+           _
+           (get-degree-renaming _ new-nb-vertices (new-name-numeric-generator))
+           (λ () (raise 'error))))
+        (map rewrite-graph
+             (map (λ (_) (append old-graph _)) new-edgess)))))
 
-(check-equal? (new-graphs '() (get-new-edgess 2)) '(((|0| |1|))))
+(check-equal? (new-graphs '() (get-new-edgess 2) 2) '(((|0| |1|))))
 
 
 (define (new-graph old-graph new-edges)
@@ -552,17 +643,17 @@
 
 (define (graphs4 nb-vertices graphs-n-1)
   (let ((new-edges (get-new-edgess nb-vertices)))
-    (remove-duplicates (apply append (map (λ (_) (new-graphs _ new-edges)) graphs-n-1)))))
+    (remove-duplicates (apply append (map (λ (_) (new-graphs _ new-edges nb-vertices)) graphs-n-1)))))
 
 (check-equal? (graphs4 2 '(())) '(((|0| |1|))))
 (check-equal? (graphs4 3 '(((|0| |1|))))
-              '(((|0| |1|) (|2| |1|)) ((|0| |1|) (|0| |2|) (|1| |2|))))
+              '(((|0| |2|) (|1| |2|)) ((|0| |1|) (|0| |2|) (|1| |2|))))
 (check-equal? (graphs4 4 '(((|0| |1|) (|2| |1|)) ((|0| |1|) (|0| |2|) (|1| |2|))))
-              '(((|0| |1|) (|2| |3|) (|1| |3|))
-                ((|0| |1|) (|2| |1|) (|3| |1|))
-                ((|0| |1|) (|2| |3|) (|2| |1|) (|3| |1|))
+              '(((|0| |2|) (|1| |3|) (|2| |3|))
+                ((|0| |3|) (|1| |3|) (|2| |3|))
+                ((|0| |3|) (|1| |2|) (|1| |3|) (|2| |3|))
                 ((|0| |1|) (|0| |2|) (|1| |3|) (|2| |3|))
-                ((|0| |1|) (|0| |2|) (|3| |1|) (|3| |2|) (|1| |2|))
+                ((|0| |2|) (|0| |3|) (|1| |2|) (|1| |3|) (|2| |3|))
                 ((|0| |1|) (|0| |2|) (|0| |3|) (|1| |2|) (|1| |3|) (|2| |3|))))
 
 (define (has-vertex-degree-1 graph)
