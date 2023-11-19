@@ -130,13 +130,15 @@
 (define (contains-deep? l x)
   (member x (flatten l)))
 
+; does the graph g contains all of elements of the list l
 (define (contains-all? g l)
   (cond ((null? l) true)
         ((null? g) false)
         (else (contains-all?
                (cdr g)
                (filter (λ(s) (not (or (equal? s (graph-first-node g))
-                                      (equal? s (graph-second-node g))))) l)))))
+                                      (equal? s (graph-second-node g)))))
+                       l)))))
 
 (define (tailrec-graph->node-set graph nodes-set)
   (if (null? graph)
@@ -148,58 +150,60 @@
 (define (graph->node-set graph)
   (tailrec-graph->node-set graph (set)))
 
-(define (tailrec-is-graph-complete? graph all-nodes-set nodes-so-far-set unused-edges)
+; nodes-so-far-set = vertices reached from the first one
+; unused-edges = edges that do not connect to the vertices of nodes-so-far-set
+(define (tailrec-is-graph-connected? graph all-nodes-set nodes-so-far-set unused-edges)
   (if (null? graph)
       (if (null? unused-edges)
           (set=? all-nodes-set nodes-so-far-set)
           (if (set-empty? (set-intersect (graph->node-set unused-edges) nodes-so-far-set))
               (list (graph-first-node unused-edges) (set-first nodes-so-far-set))
-              (tailrec-is-graph-complete? unused-edges all-nodes-set nodes-so-far-set '())))
+              (tailrec-is-graph-connected? unused-edges all-nodes-set nodes-so-far-set '())))
       (cond ((set-member? nodes-so-far-set (graph-first-node graph))
-             (tailrec-is-graph-complete?
+             (tailrec-is-graph-connected?
               (cdr graph)
               all-nodes-set
               (set-add nodes-so-far-set (graph-second-node graph))
               unused-edges))
             ((set-member? nodes-so-far-set (graph-second-node graph))
-             (tailrec-is-graph-complete?
+             (tailrec-is-graph-connected?
               (cdr graph)
               all-nodes-set
               (set-add nodes-so-far-set (graph-first-node graph))
               unused-edges))
             (else
-             (tailrec-is-graph-complete?
+             (tailrec-is-graph-connected?
               (cdr graph)
               all-nodes-set
               nodes-so-far-set
               (cons (car graph) unused-edges))))))
 
 (define set-abcd  (set 'a 'b 'c 'd))
-(check-true (tailrec-is-graph-complete? '((a b) (c d) (a c))
+(check-true (tailrec-is-graph-connected? '((a b) (c d) (a c))
                                         (set 'a 'b 'c 'd)
                                         (set 'a)
                                         '()))
-(check-true (tailrec-is-graph-complete? '((a b) (a d) (a c))
+(check-true (tailrec-is-graph-connected? '((a b) (a d) (a c))
                                         (set 'a 'b 'c 'd)
                                         (set 'a)
                                         '()))
-(check-not-equal? true (tailrec-is-graph-complete? '((a b) (c d)) (set 'a 'b 'c 'd) (set 'a) '()))
-(check-not-equal? true (tailrec-is-graph-complete? '((c d)) (set 'a 'b 'c 'd) (set 'a ' b) '()))
-(check-not-equal? true (tailrec-is-graph-complete? '() (set 'a 'b 'c 'd) (set 'a ' b) '((c d))))
-(check-true (tailrec-is-graph-complete? '((a b) (b c)) (set 'a 'b 'c) (set 'a) '()))
-(check-true (tailrec-is-graph-complete? '((a b) (a c)) (set 'a 'b 'c) (set 'a) '()))
-(check-true (tailrec-is-graph-complete? '((a b)) (set 'a 'b) (set 'a) '()))
-(check-true (tailrec-is-graph-complete? '() (set) (set) '()))
+(check-not-equal? true (tailrec-is-graph-connected? '((a b) (c d)) (set 'a 'b 'c 'd) (set 'a) '()))
+(check-not-equal? true (tailrec-is-graph-connected? '((c d)) (set 'a 'b 'c 'd) (set 'a ' b) '()))
+(check-not-equal? true (tailrec-is-graph-connected? '() (set 'a 'b 'c 'd) (set 'a ' b) '((c d))))
+(check-true (tailrec-is-graph-connected? '((a b) (b c)) (set 'a 'b 'c) (set 'a) '()))
+(check-true (tailrec-is-graph-connected? '((a b) (a c)) (set 'a 'b 'c) (set 'a) '()))
+(check-true (tailrec-is-graph-connected? '((a b)) (set 'a 'b) (set 'a) '()))
+(check-true (tailrec-is-graph-connected? '() (set) (set) '()))
 
-(define (rec-complete-graph g nodes-set)
-  (let ((complete (tailrec-is-graph-complete? g nodes-set (set (graph-first-node g)) '())))
+(define (rec-connect-graph g nodes-set)
+  (let ((complete (tailrec-is-graph-connected? g nodes-set (set (graph-first-node g)) '())))
     (if (equal? complete #true)
         g
-        (rec-complete-graph (cons complete g) nodes-set))))
+        (rec-connect-graph (cons complete g) nodes-set))))
 
 (if (equal? (version) "8.9")
-    (check-equal? (rec-complete-graph '((a b) (c d)) set-abcd) '((c b) (a b) (c d)))
-    (check-equal? (rec-complete-graph '((a b) (c d)) set-abcd) '((c a) (a b) (c d))))
+    (check-equal? (rec-connect-graph '((a b) (c d)) set-abcd) '((c b) (a b) (c d)))
+    (check-equal? (rec-connect-graph '((a b) (c d)) set-abcd) '((c a) (a b) (c d))))
 
 (define (graphs1_1 l)
   (filter (λ(g) (contains-all? g l)) (graphs1 l)))
@@ -208,65 +212,26 @@
  (graphs1_1 '(a e z))
  '(((a z) (a e)) ((e z) (a e)) ((e z) (a z)) ((e z) (a z) (a e))))
 
+; util function for tailrec-sorted-parts
 (define (tailrec-sorted-parts-update-result tmp-res x less-than?)
-    (append
-     tmp-res
-     (map
-      (lambda (_) (sort (cons x _) less-than?))
-      tmp-res)))
+  (append
+   tmp-res
+   (map
+    (lambda (_) (sort (cons x _) less-than?))
+    tmp-res)))
 
 (check-equal? (tailrec-sorted-parts-update-result '((e) ()) 'z symbol<?) '((e) () (e z) (z)))
 
 (define (tailrec-sorted-parts res l less-than?)
-    (if (null? l)
-        res
-        (tailrec-sorted-parts
-         (tailrec-sorted-parts-update-result res (car l) less-than?)
-         (cdr l)
-         less-than?)))
+  (if (null? l)
+      res
+      (tailrec-sorted-parts
+       (tailrec-sorted-parts-update-result res (car l) less-than?)
+       (cdr l)
+       less-than?)))
 
 (check-equal? (tailrec-sorted-parts '(()) '(a z e) symbol<?)
               '(() (a) (z) (a z) (e) (a e) (e z) (a e z)))
-
-(define (edge<? edge1 edge2)
-  (let ((car1 (car edge1))
-        (car2 (car edge2)))
-    (or (symbol<? car1 car2)
-        (and (not (symbol<? car2 car1)) (symbol<? (cadr edge1) (cadr edge2))))))
-
-(check-true (edge<? '(a b) '(c d)))
-(check-true (edge<? '(a b) '(a c)))
-(check-false (edge<? '(a b) '(a b)))
-(check-false (edge<? '(a c) '(a b)))
-(check-false (edge<? '(c d) '(a b)))
-
-(define (graph<? graph1 graph2)
-  (or (< (length graph1) (length graph2))
-      (and (equal? (length graph1) (length graph2))
-           (not (null? graph1))
-           (let ((edge1 (car graph1))
-                 (edge2 (car graph2)))
-             (or (edge<? edge1 edge2)
-                 (and (not (edge<? edge2 edge1)) (graph<? (cdr graph1) (cdr graph2))))))))
-
-(check-false (graph<? '() '()))
-(check-true  (graph<? '() '((a b))))
-(check-false (graph<? '((a b)) '() ))
-(check-true  (graph<? '((a b)) '((a b) (c d))))
-(check-false (graph<? '((a b) (c d)) '((a b))))
-(check-true  (graph<? '((a b)) '((a c))))
-(check-false (graph<? '((a c)) '((a b))))
-(check-false (graph<? '((a b)) '((a b))))
-(check-false (graph<? '((a b) (a c)) '((a b) (a c))))
-(check-false (graph<? '((a b) (a d)) '((a b) (a c))))
-(check-true  (graph<? '((a b) (a c)) '((a b) (a d))))
-
-(define (graphs2 l)
-  (sort (tailrec-sorted-parts '(()) (tailrec-sorted-couples '() l symbol<?) edge<?) graph<?))
-
-(check-equal?
- (graphs2 '(a e z))
-'(() ((a e)) ((a z)) ((e z)) ((a e) (a z)) ((a e) (e z)) ((a z) (e z)) ((a e) (a z) (e z))))
 
 (define (deep f l)
     (cond ((null? l) '())
@@ -294,7 +259,6 @@
                   (let ((result (apply f args)))
                     (hash-set! cache args result)
                     result))))))
-                  
 
 (define get-degree (memo (λ (symbol graph)
   (length (filter (λ (edge) (member symbol edge)) graph)))))
@@ -349,8 +313,6 @@
   (check-equal? (add-edge-nodes-by-degrees '(a c) acc)
                 '#((c b a) (c b) (a)))
   )
-  
-
 
 (define (get-graph-nodes-by-degrees graph nb-vertices)
   (vector-map reverse
@@ -361,9 +323,6 @@
 (check-equal? (get-graph-nodes-by-degrees '((a b) (a c)) 3)
               '#((a b c) (b c) (a)))
  
-        
-        
-
 ; node-renamings: a hash map linking old vertices names to new ones
 ; new-names: a function returning a new unused name each time it is called
 (define (rec-rename-graph-vertices graph node-renamings new-names)
@@ -668,7 +627,7 @@
  
 (define graphs-by-node-nb (make-vector 100))
 (vector-set! graphs-by-node-nb 1 '(()))
-(for ((i-node-nb (range 2 6)))
+(for ((i-node-nb (range 2 7)))
   (vector-set! graphs-by-node-nb i-node-nb
                  (graphs4 i-node-nb (vector-ref graphs-by-node-nb (- i-node-nb 1)))))
 
