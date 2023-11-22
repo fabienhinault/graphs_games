@@ -3,6 +3,7 @@
 (require rackunit)
 (require srfi/67) ; compare procedures
 (require racket/random)
+(require racket/trace)
 
 (define (rec-couples l)
     (if (null? l)
@@ -133,12 +134,19 @@
 ; does the graph g contains all of elements of the list l
 (define (contains-all? g l)
   (cond ((null? l) true)
-        ((null? g) false)
+        ((null? g) l)
         (else (contains-all?
                (cdr g)
                (filter (λ(s) (not (or (equal? s (graph-first-node g))
                                       (equal? s (graph-second-node g)))))
                        l)))))
+
+(define (add-absent-vertices g l)
+  (let ((? (contains-all? g l)))
+    (if (equal? ? #t)
+        g
+        (append g (map (λ (_) (list _ (random-ref l))) ?)))))
+         
 
 (define (tailrec-graph->node-set graph nodes-set)
   (if (null? graph)
@@ -157,21 +165,26 @@
       (if (null? unused-edges)
           (set=? all-nodes-set nodes-so-far-set)
           (if (set-empty? (set-intersect (graph->node-set unused-edges) nodes-so-far-set))
+              ; not connected. propose an edge to add.
               (list (graph-first-node unused-edges) (set-first nodes-so-far-set))
               (tailrec-is-graph-connected? unused-edges all-nodes-set nodes-so-far-set '())))
       (cond ((set-member? nodes-so-far-set (graph-first-node graph))
+             ; if the first vertex of the remaining edges is in the nodes reached,
+             ; then add the second vertex
              (tailrec-is-graph-connected?
               (cdr graph)
               all-nodes-set
               (set-add nodes-so-far-set (graph-second-node graph))
               unused-edges))
             ((set-member? nodes-so-far-set (graph-second-node graph))
+             ; if not, but the second vertex is, then add the first one
              (tailrec-is-graph-connected?
               (cdr graph)
               all-nodes-set
               (set-add nodes-so-far-set (graph-first-node graph))
               unused-edges))
             (else
+             ; if none are add the first edge to unused-edges
              (tailrec-is-graph-connected?
               (cdr graph)
               all-nodes-set
@@ -197,16 +210,19 @@
 
 (define (rec-connect-graph g nodes-set)
   (let ((complete (tailrec-is-graph-connected? g nodes-set (set (graph-first-node g)) '())))
-    (if (equal? complete #true)
-        g
-        (rec-connect-graph (cons complete g) nodes-set))))
+    (cond ((equal? complete #t)
+           g)
+          ((equal? complete #f)
+           (raise g))
+          (else 
+           (rec-connect-graph (cons complete g) nodes-set)))))
 
 (if (equal? (version) "8.9")
     (check-equal? (rec-connect-graph '((a b) (c d)) set-abcd) '((c b) (a b) (c d)))
     (check-equal? (rec-connect-graph '((a b) (c d)) set-abcd) '((c a) (a b) (c d))))
 
 (define (graphs1_1 l)
-  (filter (λ(g) (contains-all? g l)) (graphs1 l)))
+  (filter (λ(g) (equal? #t (contains-all? g l))) (graphs1 l)))
 
 (check-equal?
  (graphs1_1 '(a e z))
@@ -355,33 +371,6 @@
 (check-equal? (hash->list (get-degree-renaming '((a b) (a c)) 3 (new-name-alphabetic-generator)))
               '((a . c) (b . a) (c . b)))
 
-
-(define (topo-graphs2 l)
-    (let ((syms (map (λ (_) (gensym)) (range (length l)))))
-      (map
-       (λ (graph)
-         (let ((uniqs (remove-duplicates (flatten graph))))
-           (foldl replace-all-deep graph uniqs (take l (length uniqs)))))
-       (graphs2 syms))))
-
-(check-equal?
- (topo-graphs2 '(a e z))
- '(() ((a e)) ((a e)) ((a e)) ((a e) (a z)) ((a e) (e z)) ((a e) (z e)) ((a e) (a z) (e z))))
-
-(define (check-topo-graph2 l graph expected-uniqs expected-tgraph)
-  (let* ((uniqs (remove-duplicates (flatten graph)))
-         (tgraph (foldl replace-all-deep graph uniqs (take l (length uniqs)))))
-    (check-equal? uniqs expected-uniqs)
-    (check-equal? tgraph expected-tgraph)))
-
-(check-topo-graph2 '(j k l) '((a e)) '(a e) '((j k)))
-(check-topo-graph2 '(j k l) '((a z)) '(a z) '((j k)))
-(check-topo-graph2 '(j k l) '((e z)) '(e z) '((j k)))
-(check-topo-graph2 '(j k l) '((a e) (a z)) '(a e z) '((j k) (j l)))
-(check-topo-graph2 '(j k l) '((a e) (e z)) '(a e z) '((j k) (k l)))
-(check-topo-graph2 '(j k l) '((a z) (e z)) '(a z e) '((j k) (l k)))
-(check-topo-graph2 '(j k l) '((a e) (a z) (e z)) '(a e z) '((j k) (j l) (k l)))
-
 (define (get-graph-degrees graph)
   (deep (λ (_) (get-degree _ graph)) graph))
 
@@ -511,9 +500,6 @@
  (rewrite-graph '((|0| |1|) (|2| |3|) (|1| |3|) (|0| |4|) (|2| |4|) (|3| |4|)))
  '((|0| |1|) (|0| |4|) (|1| |3|) (|2| |3|) (|2| |4|) (|3| |4|)))
 
-(define (graphs3 l)
-  (sort (tailrec-sorted-parts '(()) (tailrec-sorted-couples '() l symbol<?) edge<?) graph<?))
-
 (define (edge-dot e)
   (~a (car e) " -- " (cadr e) #\newline))
 
@@ -530,7 +516,7 @@
 "))))
 
 (define (graph-name g)
-  (~a (apply string-append (map symbol->string (flatten g))) ".dot"))
+  (~a (apply string-append (map ~a (flatten g))) ".dot"))
 
 (define (write-dot-file g n)
   (with-output-to-file (~a n "/" (graph-name g))
@@ -631,6 +617,30 @@
   (vector-set! graphs-by-node-nb i-node-nb
                  (graphs4 i-node-nb (vector-ref graphs-by-node-nb (- i-node-nb 1)))))
 
+(define (pick-random-vertex graph forbidden-vertex)
+  (let* ((picked-edge (random-ref graph))
+         (picked-vertex (car picked-edge)))
+    (if (not (equal? picked-vertex forbidden-vertex))
+        picked-vertex
+        (let ((picked-vertex (cadr picked-edge)))
+          (if (not (equal? picked-vertex forbidden-vertex))
+              picked-vertex
+              (pick-random-vertex graph forbidden-vertex))))))
+
+(define (add-random-edge graph vertex)
+  (cons
+   (list vertex
+         (pick-random-vertex graph vertex))
+   graph))
+
+(define (get-graph-degree-1-vertices graph)
+  (filter (λ (_) (equal? 1 (get-degree _ graph)))
+          (flatten graph)))
+
+(define (make-all-vertices-degree2 graph)
+  (append graph
+          (map (λ (_) (list _ (pick-random-vertex graph _)))
+               (get-graph-degree-1-vertices graph))))
 
 ;(for-each
 ;   (lambda (_) (write-dot-file _ 6))
