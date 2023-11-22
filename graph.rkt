@@ -500,27 +500,31 @@
  (rewrite-graph '((|0| |1|) (|2| |3|) (|1| |3|) (|0| |4|) (|2| |4|) (|3| |4|)))
  '((|0| |1|) (|0| |4|) (|1| |3|) (|2| |3|) (|2| |4|) (|3| |4|)))
 
+(define (vertex-dot v)
+    (~a v " [id=\"" v "\"]" #\newline))
+
 (define (edge-dot e)
-  (~a (car e) " -- " (cadr e) #\newline))
+  (~a (car e) " -- " (cadr e) " [class=\"" (car e) " " (cadr e)  "\"]" #\newline))
 
 (check-equal?
- (edge-dot '(a z)) "a -- z
+ (edge-dot '(a z)) "a -- z [class=\"a z\"]
 ")
 
-(define (graph-dot g)
+(define (graph-dot g vertices)
   (string-append*
    "strict graph {
 "
-   (append (map edge-dot g)
-                (list "}
+   (append (map vertex-dot vertices)
+           (map edge-dot g)
+           (list "}
 "))))
 
 (define (graph-name g)
   (~a (apply string-append (map ~a (flatten g))) ".dot"))
 
-(define (write-dot-file g n)
+(define (write-dot-file g n vertices)
   (with-output-to-file (~a n "/" (graph-name g))
-    (λ() (printf (graph-dot g)))))
+    (λ() (printf (graph-dot g vertices)))))
 
 (define (random-edge l)
   (let* ((v1 (random-ref l)))
