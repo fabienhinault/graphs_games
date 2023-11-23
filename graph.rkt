@@ -501,18 +501,19 @@
  '((|0| |1|) (|0| |4|) (|1| |3|) (|2| |3|) (|2| |4|) (|3| |4|)))
 
 (define (vertex-dot v)
-    (~a v " [id=\"" v "\"]" #\newline))
+    (~a v " [id=\"" v "\" fillcolor=\"gray99\"]" #\newline))
 
 (define (edge-dot e)
-  (~a (car e) " -- " (cadr e) " [class=\"" (car e) " " (cadr e)  "\"]" #\newline))
+  (~a (car e) " -- " (cadr e) " [class=\"_" (car e) " _" (cadr e)  "\"]" #\newline))
 
 (check-equal?
- (edge-dot '(a z)) "a -- z [class=\"a z\"]
+ (edge-dot '(a z)) "a -- z [class=\"_a _z\"]
 ")
 
 (define (graph-dot g vertices)
   (string-append*
    "strict graph {
+node [shape=circle style=filled fillcolor=gray99]
 "
    (append (map vertex-dot vertices)
            (map edge-dot g)
@@ -645,6 +646,7 @@
   (append graph
           (map (λ (_) (list _ (pick-random-vertex graph _)))
                (get-graph-degree-1-vertices graph))))
+
 
 ;(for-each
 ;   (lambda (_) (write-dot-file _ 6))
