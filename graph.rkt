@@ -338,7 +338,21 @@
 
 (check-equal? (get-graph-nodes-by-degrees '((a b) (a c)) 3)
               '#((a b c) (b c) (a)))
- 
+
+
+(define (add-edge-to-graph-vector edge acc-vector-nextss)
+  (vector-set! acc-vector-nextss (car edge)
+               (cons (cadr edge) (vector-ref acc-vector-nextss (car edge))))
+  (vector-set! acc-vector-nextss (cadr edge)
+               (cons (car edge) (vector-ref acc-vector-nextss (cadr edge))))
+  acc-vector-nextss)
+
+(define (get-graph-nextss graph nb-vertices)
+  (foldl add-edge-to-graph-vector (make-vector nb-vertices '()) graph))
+
+(check-equal? (get-graph-nextss '((0 2) (1 2)) 3) '#((2) (2) (1 0)))
+
+         
 ; node-renamings: a hash map linking old vertices names to new ones
 ; new-names: a function returning a new unused name each time it is called
 (define (rec-rename-graph-vertices graph node-renamings new-names)
@@ -647,7 +661,8 @@ node [shape=circle style=filled fillcolor=gray99]
           (map (λ (_) (list _ (pick-random-vertex graph _)))
                (get-graph-degree-1-vertices graph))))
 
-
 ;(for-each
 ;   (lambda (_) (write-dot-file _ 6))
 ;   (filter has-no-vertex-degree-1 _6))
+
+
