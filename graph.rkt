@@ -4,6 +4,8 @@
 (require srfi/67) ; compare procedures
 (require racket/random)
 (require racket/trace)
+(require json)
+(require net/base64)
 
 (define (rec-couples l)
     (if (null? l)
@@ -348,9 +350,9 @@
   acc-vector-nextss)
 
 (define (get-graph-nextss graph nb-vertices)
-  (foldl add-edge-to-graph-vector (make-vector nb-vertices '()) graph))
+  (deep ~a (vector->list (foldl add-edge-to-graph-vector (make-vector nb-vertices '()) graph))))
 
-(check-equal? (get-graph-nextss '((0 2) (1 2)) 3) '#((2) (2) (1 0)))
+(check-equal? (get-graph-nextss '((0 2) (1 2)) 3) '(("2") ("2") ("1" "0")))
 
          
 ; node-renamings: a hash map linking old vertices names to new ones
@@ -535,11 +537,19 @@ node [shape=circle style=filled fillcolor=gray99]
 "))))
 
 (define (graph-name g)
-  (~a (apply string-append (map ~a (flatten g))) ".dot"))
+  (string-replace
+   (string-replace
+    (string-replace
+     (bytes->string/utf-8 (base64-encode (list->bytes (flatten g)) ""))
+     "+" "-")
+    "/" "_")
+   "=" ""))
 
 (define (write-dot-file g n vertices)
-  (with-output-to-file (~a n "/" (graph-name g))
-    (λ() (printf (graph-dot g vertices)))))
+  (with-output-to-file (~a n "/" (graph-name g) ".dot")
+    (λ() (printf (graph-dot g vertices))))
+  (with-output-to-file (~a n "/" (graph-name g) ".json")
+    (λ() (write-json (get-graph-nextss g (length vertices))))))
 
 (define (random-edge l)
   (let* ((v1 (random-ref l)))
@@ -664,5 +674,6 @@ node [shape=circle style=filled fillcolor=gray99]
 ;(for-each
 ;   (lambda (_) (write-dot-file _ 6))
 ;   (filter has-no-vertex-degree-1 _6))
+
 
 
