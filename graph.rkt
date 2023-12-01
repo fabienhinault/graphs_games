@@ -511,7 +511,7 @@
  '((0 1) (0 4) (1 3) (2 3) (2 4) (3 4)))
 
 (define (vertex-dot v)
-    (~a v " [id=\"" v "\" fillcolor=\"gray99\"]" #\newline))
+    (~a v " [id=\"" v "\"]" #\newline))
 
 (define (edge-dot e)
   (~a (car e) " -- " (cadr e) " [class=\"_" (car e) " _" (cadr e)  "\"]" #\newline))
