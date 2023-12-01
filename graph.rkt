@@ -545,10 +545,19 @@ node [shape=circle style=filled fillcolor=gray99]
     "/" "_")
    "=" ""))
 
-(define (write-dot-file g n vertices)
-  (with-output-to-file (~a n "/" (graph-name g) ".dot")
+(check-equal? (graph-name '((0 1) (0 2))) "AAEAAg")
+
+(define (make-directory-and-parents dir)
+  (when (not (directory-exists? dir))
+    (make-directory-and-parents (simplify-path (build-path dir 'up)))
+    (make-directory dir)))
+
+(define (write-dot-file g dir vertices)
+  (when (not (directory-exists? dir))
+      (make-directory-and-parents dir))
+  (with-output-to-file (~a dir "/" (graph-name g) ".dot")
     (λ() (printf (graph-dot g vertices))))
-  (with-output-to-file (~a n "/" (graph-name g) ".json")
+  (with-output-to-file (~a dir "/" (graph-name g) ".json")
     (λ() (write-json (get-graph-nextss g (length vertices))))))
 
 (define (random-edge l)
@@ -556,7 +565,8 @@ node [shape=circle style=filled fillcolor=gray99]
     (list v1 (random-ref (remove v1 l)))))
 
 (define (random-graph l nb-edges)
-  (build-list nb-edges (λ(_) (random-edge l))))
+  (build-list nb-edges (λ (_) (random-edge l))))
+
 
 (define (symbols n)
   (map string->symbol (map ~a (range n))))
@@ -662,14 +672,27 @@ node [shape=circle style=filled fillcolor=gray99]
          (pick-random-vertex graph vertex))
    graph))
 
-(define (get-graph-degree-1-vertices graph)
+(define (get-graph-degree-1-vertices graph vertices)
   (filter (λ (_) (equal? 1 (get-degree _ graph)))
-          (flatten graph)))
+          vertices))
 
-(define (make-all-vertices-degree2 graph)
+(define (make-all-vertices-degree2 graph vertices)
   (append graph
-          (map (λ (_) (list _ (pick-random-vertex graph _)))
-               (get-graph-degree-1-vertices graph))))
+          (map (λ (_) (list _ (random-ref (remove _ vertices))))
+               (get-graph-degree-1-vertices graph vertices))))
+
+(define (create-random-edinburgh-graph vertices nb-edges)
+  (rec-connect-graph
+   (make-all-vertices-degree2
+    (add-absent-vertices (random-graph vertices nb-edges) vertices)
+    vertices)
+   (list->set vertices)))
+
+(define (write-random-edinburgh-dot nb-vertices nb-edges)
+  (let* ((vertices (range nb-vertices))
+         (graph (create-random-edinburgh-graph vertices nb-edges))
+         (final-nb-edges (length graph)))
+    (write-dot-file graph (~a nb-vertices "/" final-nb-edges) vertices)))
 
 ;(for-each
 ;   (lambda (_) (write-dot-file _ 6))
