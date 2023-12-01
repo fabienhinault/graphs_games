@@ -511,7 +511,7 @@
  '((0 1) (0 4) (1 3) (2 3) (2 4) (3 4)))
 
 (define (vertex-dot v)
-    (~a v " [id=\"" v "\"]" #\newline))
+    (~a v " [id=\"id" v "\"]" #\newline))
 
 (define (edge-dot e)
   (~a (car e) " -- " (cadr e) " [class=\"_" (car e) " _" (cadr e)  "\"]" #\newline))
@@ -683,8 +683,10 @@ node [shape=circle style=filled fillcolor=gray99]
 (define (write-random-edinburgh-dot nb-vertices nb-edges)
   (let* ((vertices (range nb-vertices))
          (graph (create-random-edinburgh-graph vertices nb-edges))
-         (final-nb-edges (length graph)))
-    (write-dot-file graph (~a nb-vertices "/" final-nb-edges) vertices)))
+         (final-nb-edges (length graph))
+         (path (~a nb-vertices "/" final-nb-edges)))
+    (write-dot-file graph path vertices)
+    path))
 
 ;(for-each
 ;   (lambda (_) (write-dot-file _ 6))

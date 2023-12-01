@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', function() {
             let ellipse = current.querySelector('ellipse + ellipse')
             ellipse.setAttribute('fill', 'gray');
             if (last !== undefined) {
-                document.querySelectorAll(`g._${last.id}`).forEach(_ => _.remove());
+                document.querySelectorAll(`g._${last.id.substring(2)}`).forEach(_ => _.remove());
                 last.remove();
             }
             possibleIds = nextss[current.id];
