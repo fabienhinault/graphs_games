@@ -288,13 +288,7 @@
 (define (new-name-numeric-generator)
   (let ((count 0))
     (λ () (begin0
-            (string->symbol (~a count))
-            (set! count (+ 1 count))))))
-
-(define (new-name-alphabetic-generator)
-  (let ((count 0))
-    (λ () (begin0
-            (string->symbol (~a (integer->char (+ count (char->integer #\a)))))
+            count
             (set! count (+ 1 count))))))
 
 ; auxiliary function for get-graph-nodes-by-degrees
@@ -384,8 +378,8 @@
          (flatten (vector->list vector-graph-nodes-by-degree)))
     node-renamings))
 
-(check-equal? (hash->list (get-degree-renaming '((a b) (a c)) 3 (new-name-alphabetic-generator)))
-              '((a . c) (b . a) (c . b)))
+(check-equal? (hash->list (get-degree-renaming '((0 1) (0 2)) 3 (new-name-numeric-generator)))
+              '((0 . 2) (2 . 1) (1 . 0)))
 
 (define (get-graph-degrees graph)
   (deep (λ (_) (get-degree _ graph)) graph))
@@ -421,10 +415,10 @@
         (integer-compare (get-vertex-degree (car e1)) (get-vertex-degree (car e2)))
         (integer-compare (get-vertex-degree (cadr e1)) (get-vertex-degree (cadr e2))))))
 
-(define (edge-symbol-compare e1 e2)
+(define (edge-vertex-compare e1 e2)
   (refine-compare
-   (symbol-compare (car e1) (car e2))
-   (symbol-compare (cadr e1) (cadr e2))))
+   (integer-compare (car e1) (car e2))
+   (integer-compare (cadr e1) (cadr e2))))
 
 ; the vertices are supposed to be sorted in the edge
 (define (edge<?* get-vertex-degree)
@@ -432,7 +426,7 @@
     (λ (e1 e2)
       (< (refine-compare
           (edge-degree-compare e1 e2)
-          (edge-symbol-compare e1 e2))
+          (edge-vertex-compare e1 e2))
          0))))
 
 (let* ((degrees (make-hash))
@@ -440,30 +434,30 @@
        (vertice-compare (λ (v1 v2)
                           (refine-compare
                            (integer-compare (hash-ref degrees v1) (hash-ref degrees v2))
-                           (symbol-compare v1 v2))))
+                           (integer-compare v1 v2))))
        (vertice<? (λ (v1 v2) (< (vertice-compare v1 v2)
                                 0)))
-       (graph '((|0| |1|) (|2| |3|) (|1| |3|) (|0| |4|) (|1| |4|) (|2| |4|))))
+       (graph '((0 1) (2 3) (1 3) (0 4) (1 4) (2 4))))
   (deep (λ (_) (hash-set! degrees _ (get-degree _ graph))) graph)
   (check-equal? (map (λ (_) (sort _ vertice<?)) graph)
-                '((|0| |1|) (|2| |3|) (|3| |1|) (|0| |4|) (|1| |4|) (|2| |4|)))
-  (check-equal? (get-v-degree '|2|) 2)
-  (check-true ((edge<?* get-v-degree) '(|2| |3|) '(|0| |4|))))
+                '((0 1) (2 3) (3 1) (0 4) (1 4) (2 4)))
+  (check-equal? (get-v-degree '2) 2)
+  (check-true ((edge<?* get-v-degree) '(2 3) '(0 4))))
 
-(let* ((G '((a z) (a e)))
+(let* ((G '((0 2) (0 1)))
        (e<? (edge<?* (λ (_) (get-degree _ G)))))
-  (check-false (e<? '(z a) '(e a)))
-  (check-false (e<? '(z a) '(e a)))
-  (check-true  (e<? '(e a) '(z a))))
+  (check-false (e<? '(2 0) '(1 0)))
+  (check-false (e<? '(2 0) '(1 0)))
+  (check-true  (e<? '(1 0) '(2 0))))
   
-(let* ((G '((|0| |1|) (|0| |2|) (|1| |4|) (|3| |2|) (|3| |4|) (|2| |4|)))
+(let* ((G '((0 1) (0 2) (1 4) (3 2) (3 4) (2 4)))
        ; degrees:  0:2  1:2  2:3  3:2  4:3 
        (e<? (edge<?* (λ (_) (get-degree _ G)))))
-  (check-true  (e<? '(|0| |1|) '(|0| |2|)))
-  (check-true  (e<? '(|0| |2|) '(|1| |4|)))
-  (check-true  (e<? '(|1| |4|) '(|3| |2|)))
-  (check-true  (e<? '(|3| |2|) '(|3| |4|)))
-  (check-true  (e<? '(|3| |4|) '(|2| |4|))))
+  (check-true  (e<? '(0 1) '(0 2)))
+  (check-true  (e<? '(0 2) '(1 4)))
+  (check-true  (e<? '(1 4) '(3 2)))
+  (check-true  (e<? '(3 2) '(3 4)))
+  (check-true  (e<? '(3 4) '(2 4))))
   
 
 (define (edge-compare* graph)
@@ -481,17 +475,17 @@
   (define (vertice-compare v1 v2)
     (refine-compare
         (integer-compare (hash-ref degrees v1) (hash-ref degrees v2))
-        (symbol-compare v1 v2)))
+        (integer-compare v1 v2)))
   (define (vertice<? v1 v2) (< (vertice-compare v1 v2)
                                0))
   (sort (map (λ (_) (sort _ vertice<?)) graph) (edge<?* (λ (_) (hash-ref degrees _)))))
   
 (check-equal?
- (get-graph-degrees (rewrite-graph '((|0| |1|) (|2| |3|) (|1| |3|) (|0| |4|) (|1| |4|) (|2| |4|))))
+ (get-graph-degrees (rewrite-graph '((0 1) (2 3) (1 3) (0 4) (1 4) (2 4))))
  '((2 2) (2 3) (2 3) (2 3) (2 3) (3 3)))
 
 (check-equal?
- (get-graph-degrees (rewrite-graph '((|0| |1|) (|2| |3|) (|1| |3|) (|0| |4|) (|2| |4|) (|3| |4|))))
+ (get-graph-degrees (rewrite-graph '((0 1) (2 3) (1 3) (0 4) (2 4) (3 4))))
  '((2 2) (2 3) (2 3) (2 3) (2 3) (3 3)))
 
 ;  2     0
@@ -502,8 +496,8 @@
 ;    \|/
 ;     1
 (check-equal?
- (rewrite-graph '((|0| |1|) (|2| |3|) (|1| |3|) (|0| |4|) (|1| |4|) (|2| |4|)))
- '((|2| |3|) (|0| |1|) (|0| |4|) (|2| |4|) (|3| |1|) (|1| |4|)))
+ (rewrite-graph '((0 1) (2 3) (1 3) (0 4) (1 4) (2 4)))
+ '((2 3) (0 1) (0 4) (2 4) (3 1) (1 4)))
 
 ;  0     2
 ;  |\   /|
@@ -513,8 +507,8 @@
 ;    \|/
 ;     3
 (check-equal?
- (rewrite-graph '((|0| |1|) (|2| |3|) (|1| |3|) (|0| |4|) (|2| |4|) (|3| |4|)))
- '((|0| |1|) (|0| |4|) (|1| |3|) (|2| |3|) (|2| |4|) (|3| |4|)))
+ (rewrite-graph '((0 1) (2 3) (1 3) (0 4) (2 4) (3 4)))
+ '((0 1) (0 4) (1 3) (2 3) (2 4) (3 4)))
 
 (define (vertex-dot v)
     (~a v " [id=\"" v "\" fillcolor=\"gray99\"]" #\newline))
@@ -567,29 +561,23 @@ node [shape=circle style=filled fillcolor=gray99]
 (define (random-graph l nb-edges)
   (build-list nb-edges (λ (_) (random-edge l))))
 
-
-(define (symbols n)
-  (map string->symbol (map ~a (range n))))
-
-(check-equal? (symbols 3) '(|0| |1| |2|))
-
 (define (get-new-edgess n)
-  (let* ((new-node (string->symbol(~a (- n 1))))
-         (old-nodes (symbols (- n 1)))
+  (let* ((new-node (- n 1))
+         (old-nodes (range (- n 1)))
          (new-edges (map (λ (_) (list _ new-node)) old-nodes)))
     ; remove '() at start
     (cdr (tailrec-parts '(()) new-edges))))
 
 (check-equal? (get-new-edgess 0) '())
 (check-equal? (get-new-edgess 1) '())
-(check-equal? (get-new-edgess 2) '(((|0| |1|))))
-(check-equal? (get-new-edgess 3) '(((|0| |2|)) ((|1| |2|)) ((|1| |2|) (|0| |2|))))
+(check-equal? (get-new-edgess 2) '(((0 1))))
+(check-equal? (get-new-edgess 3) '(((0 2)) ((1 2)) ((1 2) (0 2))))
 (check-equal? (get-new-edgess 4)
-              '(((|0| |3|)) ((|1| |3|))
-                            ((|1| |3|) (|0| |3|)) 
-                            ((|2| |3|))
-                            ((|2| |3|) (|0| |3|)) ((|2| |3|) (|1| |3|))
-                            ((|2| |3|) (|1| |3|) (|0| |3|))))
+              '(((0 3)) ((1 3))
+                            ((1 3) (0 3)) 
+                            ((2 3))
+                            ((2 3) (0 3)) ((2 3) (1 3))
+                            ((2 3) (1 3) (0 3))))
 
 
 ; old-graph: a graph of (n - 1) vertices
@@ -607,7 +595,7 @@ node [shape=circle style=filled fillcolor=gray99]
         (map rewrite-graph
              (map (λ (_) (append old-graph _)) new-edgess)))))
 
-(check-equal? (new-graphs '() (get-new-edgess 2) 2) '(((|0| |1|))))
+(check-equal? (new-graphs '() (get-new-edgess 2) 2) '(((0 1))))
 
 
 (define (new-graph old-graph new-edges)
@@ -617,28 +605,28 @@ node [shape=circle style=filled fillcolor=gray99]
                               (make-hash) (new-name-numeric-generator))))
 
 
-;                          (|1| |0|) (|3| |2|) (|0| |2|)    (|1| |4|) (|2| |4|) (|3| |4|)
-(check-equal? (new-graph '((|0| |1|) (|2| |3|) (|1| |3|)) '((|0| |4|) (|2| |4|) (|3| |4|)))
-              '((|0| |1|) (|0| |2|) (|1| |3|) (|4| |2|) (|4| |3|) (|2| |3|)))
+;                          (1 0) (3 2) (0 2)    (1 4) (2 4) (3 4)
+(check-equal? (new-graph '((0 1) (2 3) (1 3)) '((0 4) (2 4) (3 4)))
+              '((0 1) (0 2) (1 3) (4 2) (4 3) (2 3)))
 
-(check-equal? (new-graph '((|0| |1|) (|2| |3|) (|1| |3|)) '((|0| |4|) (|1| |4|) (|2| |4|)))
-              '((|0| |1|) (|0| |4|) (|1| |3|) (|2| |3|) (|2| |4|) (|3| |4|)))
+(check-equal? (new-graph '((0 1) (2 3) (1 3)) '((0 4) (1 4) (2 4)))
+              '((0 1) (0 4) (1 3) (2 3) (2 4) (3 4)))
 
 
 (define (graphs4 nb-vertices graphs-n-1)
   (let ((new-edges (get-new-edgess nb-vertices)))
     (remove-duplicates (apply append (map (λ (_) (new-graphs _ new-edges nb-vertices)) graphs-n-1)))))
 
-(check-equal? (graphs4 2 '(())) '(((|0| |1|))))
-(check-equal? (graphs4 3 '(((|0| |1|))))
-              '(((|0| |2|) (|1| |2|)) ((|0| |1|) (|0| |2|) (|1| |2|))))
-(check-equal? (graphs4 4 '(((|0| |1|) (|2| |1|)) ((|0| |1|) (|0| |2|) (|1| |2|))))
-              '(((|0| |2|) (|1| |3|) (|2| |3|))
-                ((|0| |3|) (|1| |3|) (|2| |3|))
-                ((|0| |3|) (|1| |2|) (|1| |3|) (|2| |3|))
-                ((|0| |1|) (|0| |2|) (|1| |3|) (|2| |3|))
-                ((|0| |2|) (|0| |3|) (|1| |2|) (|1| |3|) (|2| |3|))
-                ((|0| |1|) (|0| |2|) (|0| |3|) (|1| |2|) (|1| |3|) (|2| |3|))))
+(check-equal? (graphs4 2 '(())) '(((0 1))))
+(check-equal? (graphs4 3 '(((0 1))))
+              '(((0 2) (1 2)) ((0 1) (0 2) (1 2))))
+(check-equal? (graphs4 4 '(((0 1) (2 1)) ((0 1) (0 2) (1 2))))
+              '(((0 2) (1 3) (2 3))
+                ((0 3) (1 3) (2 3))
+                ((0 3) (1 2) (1 3) (2 3))
+                ((0 1) (0 2) (1 3) (2 3))
+                ((0 2) (0 3) (1 2) (1 3) (2 3))
+                ((0 1) (0 2) (0 3) (1 2) (1 3) (2 3))))
 
 (define (has-vertex-degree-1 graph)
   (member 1 (flatten (deep (λ (_) (get-degree _ graph)) graph))))
@@ -646,9 +634,9 @@ node [shape=circle style=filled fillcolor=gray99]
 (define (has-no-vertex-degree-1 graph)
   (not (has-vertex-degree-1 graph)))
 
-(check-equal? (has-vertex-degree-1 '((|0| |1|) (|2| |3|) (|1| |3|))) '(1 2 1 2 2 2))
+(check-equal? (has-vertex-degree-1 '((0 1) (2 3) (1 3))) '(1 2 1 2 2 2))
 (check-false
- (has-vertex-degree-1 '((|0| |1|) (|0| |2|) (|0| |3|) (|1| |2|) (|1| |3|) (|2| |3|))))
+ (has-vertex-degree-1 '((0 1) (0 2) (0 3) (1 2) (1 3) (2 3))))
  
 (define graphs-by-node-nb (make-vector 100))
 (vector-set! graphs-by-node-nb 1 '(()))
@@ -682,11 +670,15 @@ node [shape=circle style=filled fillcolor=gray99]
                (get-graph-degree-1-vertices graph vertices))))
 
 (define (create-random-edinburgh-graph vertices nb-edges)
-  (rec-connect-graph
-   (make-all-vertices-degree2
-    (add-absent-vertices (random-graph vertices nb-edges) vertices)
-    vertices)
-   (list->set vertices)))
+  (rewrite-graph
+   (rec-rename-graph-vertices
+    (rewrite-graph 
+     (rec-connect-graph
+      (make-all-vertices-degree2
+       (add-absent-vertices (random-graph vertices nb-edges) vertices)
+       vertices)
+      (list->set vertices)))
+    (make-hash) (new-name-numeric-generator))))
 
 (define (write-random-edinburgh-dot nb-vertices nb-edges)
   (let* ((vertices (range nb-vertices))

@@ -1,2 +1,7 @@
 *.dot
-
+*.svg
+*.html
+*.pdf
+*.png
+*.swp
+*~
