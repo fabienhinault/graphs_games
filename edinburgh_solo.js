@@ -1,5 +1,12 @@
 "use strict";
 
+let last;
+let current;
+let possibleIds;
+let winnings = new Set();
+let losings = new Set();
+
+
 function getRandomInt(min, max) {
   return Math.floor(Math.random() * (max - min) + min);
 }
@@ -27,12 +34,6 @@ function enlargeVertices() {
 
 document.addEventListener('DOMContentLoaded', function() {
     enlargeVertices();
-    let last;
-    let current;
-    let possibleIds;
-    let winnings = new Set();
-    let losings = new Set();
-
     // add winnings and losings while updating nextss
     function takeWinnings(nexts, iNexts) {
         if (nexts.length === 1) {
@@ -42,20 +43,33 @@ document.addEventListener('DOMContentLoaded', function() {
         return nexts
     }
 
-//    function chooseNext() {
-//        if 
+    function chooseNext() {
+        const winning = possibleIds.find(id => winnings.has(id));
+        if (winning) {
+            return winning;
+        }
+        return pick(possibleIds.filter(id => !losings.has(id))) ??
+            pick(possibleIds);
+    }
+
     function play(tmp) {
         last = current;
         current = tmp;
+        const currentId = getNodeId(current);
         let ellipse = current.querySelector('ellipse + ellipse')
         ellipse.setAttribute('fill', 'gray');
         if (last !== undefined) {
-            document.querySelectorAll(`g._${getNodeId(last)}`).forEach(_ => _.remove());
+            const lastId = getNodeId(last);
+            document.querySelectorAll(`g._${lastId}`).forEach(_ => _.remove());
             last.remove();
+            winnings.clear();
+            losings.clear();
+            nextss = nextss.map((nexts, iNexts) => {
+                return takeWinnings(nexts.filter(next => next !== lastId), iNexts);
+            });
         }
-        const currentId = getNodeId(current);
-        nextss = nextss.map((nexts, iNexts) => takeWinnings(nexts.filter(next => next !== currentId), iNexts));
-        possibleIds = nextss[currentId];
+        possibleIds = [...nextss[currentId]];
+        nextss[currentId] = [];
     }
 
     document.body.onclick = (event) => {
@@ -63,7 +77,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tmp && (possibleIds === undefined || possibleIds.includes(getNodeId(tmp)))) {
             play(tmp);
             if (possibleIds.length > 0) {
-                const botChoice = pick(possibleIds);
+                const botChoice = chooseNext();
                 const botElement = document.querySelector(`g#id${botChoice}`);
                 setTimeout(() => {play(botElement);}, 1000);
             }
