@@ -5,6 +5,7 @@ let current;
 let possibleIds;
 let winnings = new Set();
 let losings = new Set();
+const game = [];
 
 
 function getRandomInt(min, max) {
@@ -17,6 +18,30 @@ function pick(array) {
 
 function getNodeId(node) {
     return node.id.substring(2);
+}
+
+function min(array, f) {
+    return array.reduce((acc, cur) => {
+        const currentValue = f(cur);
+        if (currentValue < acc.value) {
+            return {element: cur, value: currentValue};
+        } else {
+            return acc;
+        }
+    },
+    {value: Number.MAX_VALUE});
+}
+
+function argMin(array, f) {
+    return min(array, f).element;
+}
+
+function evaluatePlay(nextId) {
+    const storedValue = localStorage.getItem([...game, nextId]);
+    if (storedValue !== null) {
+        return storedValue;
+    }
+    return 0.5;
 }
 
 function enlargeVertices() {
@@ -48,14 +73,21 @@ document.addEventListener('DOMContentLoaded', function() {
         if (winning) {
             return winning;
         }
-        return pick(possibleIds.filter(id => !losings.has(id))) ??
-            pick(possibleIds);
+        const notLosings = possibleIds.filter(id => !losings.has(id));
+        if (notLosings.length === 1) {
+            return notLosings[0];
+        }
+        if (notLosings.length > 1) {
+            return argMin(notLosings, evaluatePlay);
+        }
+        return pick(possibleIds);
     }
 
     function play(tmp) {
         last = current;
         current = tmp;
         const currentId = getNodeId(current);
+        game.push(currentId);
         let ellipse = current.querySelector('ellipse + ellipse')
         ellipse.setAttribute('fill', 'gray');
         if (last !== undefined) {
@@ -80,6 +112,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 const botChoice = chooseNext();
                 const botElement = document.querySelector(`g#id${botChoice}`);
                 setTimeout(() => {play(botElement);}, 1000);
+            } else {
+                // the values are: 1 if the first player wins, 0 if the second player wins.
+                // As the bot always plays second, 0 are winning games, 1 are losing games.
+                localStorage.setItem(game, game.length % 2);
             }
         }
     }
