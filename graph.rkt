@@ -559,7 +559,7 @@ node [shape=circle style=filled fillcolor=gray99]
     (list v1 (random-ref (remove v1 l)))))
 
 (define (random-graph l nb-edges)
-  (build-list nb-edges (λ (_) (random-edge l))))
+  (remove-duplicates (build-list nb-edges (λ (_) (random-edge l)))))
 
 (define (get-new-edgess n)
   (let* ((new-node (- n 1))
