@@ -93,10 +93,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return winning;
         }
         const notLosings = possibleIds.filter(id => !losings.has(id));
-        if (notLosings.length === 1) {
-            return notLosings[0];
-        }
-        if (notLosings.length > 1) {
+        if (notLosings.length >= 1) {
             return pick(argsMin(notLosings, evaluatePlay));
         }
         localStorage.setItem(game, 1);
@@ -127,6 +124,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // the values are: 1 if the first player wins, 0 if the second player wins.
             // As the bot always plays second, 0 are winning games, 1 are losing games.
             localStorage.setItem(game, game.length % 2);
+            localStorage.setItem(game.slice(0, game.length -1), game.length % 2);
         }
     }
 
