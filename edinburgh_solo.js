@@ -2,6 +2,7 @@
 
 let last;
 let current;
+let currentId;
 let possibleIds;
 let winnings = new Set();
 let losings = new Set();
@@ -24,7 +25,9 @@ function min(array, f) {
     return array.reduce((acc, cur) => {
         const currentValue = f(cur);
         if (currentValue < acc.value) {
-            return {element: cur, value: currentValue};
+            return {elements: [cur], value: currentValue};
+        } else if (currentValue === acc.value) {
+            return {elements: [...acc.elements, cur], value: currentValue};
         } else {
             return acc;
         }
@@ -32,8 +35,22 @@ function min(array, f) {
     {value: Number.MAX_VALUE});
 }
 
-function argMin(array, f) {
-    return min(array, f).element;
+function max(array, f) {
+    return array.reduce((acc, cur) => {
+        const currentValue = f(cur);
+        if (currentValue > acc.value) {
+            return {elements: [cur], value: currentValue};
+        } else if (currentValue === acc.value) {
+            return {elements: [...acc.elements, cur], value: currentValue};
+        } else {
+            return acc;
+        }
+    },
+    {value: -Number.MAX_VALUE});
+}
+
+function argsMin(array, f) {
+    return min(array, f).elements;
 }
 
 function evaluatePlay(nextId) {
@@ -61,7 +78,7 @@ document.addEventListener('DOMContentLoaded', function() {
     enlargeVertices();
     // add winnings and losings while updating nextss
     function takeWinnings(nexts, iNexts) {
-        if (nexts.length === 1) {
+        if (iNexts != currentId && nexts.length === 1) {
             winnings.add(iNexts.toString());
             losings.add(nexts[0]);
         }
@@ -69,8 +86,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function chooseNext() {
+        const gam = game.slice(0, game.length -1);
         const winning = possibleIds.find(id => winnings.has(id));
         if (winning) {
+            localStorage.setItem(game, 0);
             return winning;
         }
         const notLosings = possibleIds.filter(id => !losings.has(id));
@@ -78,15 +97,17 @@ document.addEventListener('DOMContentLoaded', function() {
             return notLosings[0];
         }
         if (notLosings.length > 1) {
-            return argMin(notLosings, evaluatePlay);
+            return pick(argsMin(notLosings, evaluatePlay));
         }
+        localStorage.setItem(game, 1);
+        localStorage.setItem(gam, 1);
         return pick(possibleIds);
     }
 
     function play(tmp) {
         last = current;
         current = tmp;
-        const currentId = getNodeId(current);
+        currentId = getNodeId(current);
         game.push(currentId);
         let ellipse = current.querySelector('ellipse + ellipse')
         ellipse.setAttribute('fill', 'gray');
@@ -102,6 +123,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         possibleIds = [...nextss[currentId]];
         nextss[currentId] = [];
+        if (possibleIds.length === 0) {
+            // the values are: 1 if the first player wins, 0 if the second player wins.
+            // As the bot always plays second, 0 are winning games, 1 are losing games.
+            localStorage.setItem(game, game.length % 2);
+        }
     }
 
     document.body.onclick = (event) => {
@@ -112,12 +138,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 const botChoice = chooseNext();
                 const botElement = document.querySelector(`g#id${botChoice}`);
                 setTimeout(() => {play(botElement);}, 1000);
-            } else {
-                // the values are: 1 if the first player wins, 0 if the second player wins.
-                // As the bot always plays second, 0 are winning games, 1 are losing games.
-                localStorage.setItem(game, game.length % 2);
             }
         }
     }
 });
-    
+
