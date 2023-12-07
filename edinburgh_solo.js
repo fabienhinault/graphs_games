@@ -185,8 +185,20 @@ document.addEventListener('DOMContentLoaded', function() {
         ellipse.setAttribute('fill', 'gray');
         if (last !== undefined) {
             const lastId = getNodeId(last);
-            document.querySelectorAll(`g._${lastId}`).forEach(_ => _.remove());
-            last.remove();
+            document.querySelectorAll(`g._${lastId}`).forEach(g => {
+                if (g.getAttribute('class').includes(`_${currentId}`)) {
+                    g.querySelector('path').setAttribute('stroke', 'lightgray');
+                } else if(game.length < 3 || !g.getAttribute('class').includes(`_${game[game.length - 3]}`)) {
+                    g.remove();
+                }
+            });
+            const lastCircle = last.querySelector('ellipse + ellipse');
+            lastCircle.setAttribute('stroke', 'lightgray');
+            lastCircle.setAttribute('fill', 'none');
+            if (game.length === 2) {
+                lastCircle.setAttribute('stroke-width', '3');
+            }
+            last.querySelector('text').setAttribute('style', 'fill: lightgray;');
             winnings.clear();
             losings.clear();
             nextss = nextss.map((nexts, iNexts) => {
