@@ -13,7 +13,7 @@ const firstPlayer = 1000;
 const secondPlayer = 0;
 const probableFirstPlayer = 750;
 const probableSecondPlayer = 250;
-const unsure = 500;
+const unsure = (probableFirstPlayer + probableSecondPlayer) / 2;
 const sequenceValuesMap = new Map([
     [probableSecondPlayer, probableSecondPlayer],
     [(probableSecondPlayer + unsure) / 2 , probableSecondPlayer],
@@ -31,6 +31,15 @@ function getRandomInt(min, max) {
 
 function pick(array) {
     return array[getRandomInt(0, array.length)];
+}
+
+function pickWeighted(weighteds) {
+    const summedWeights = weighteds.reduce((acc, cur) => {
+        acc.push((acc[acc.length - 1] ?? 0) + cur.weight);
+        return acc;
+    }, []);
+    const r = Math.random() * summedWeights[summedWeights.length - 1];
+    return weighteds[summedWeights.findIndex(aw => aw >= r)];
 }
 
 function getNodeId(node) {
@@ -114,6 +123,8 @@ function evaluateSequence(sequence) {
 }
 
 function evaluateSubsequences(sequence) {
+    localStorage.setItem(game, getLastPlayer(game));
+    localStorage.setItem(game.slice(0, game.length -1), getLastPlayer(game));
     range(sequence.length - 1, 1).reverse().map(_ => sequence.slice(0, _)).forEach((subsequence) => {
         const value = evaluateSequence(subsequence);
         if (value !== unsure) {
@@ -132,7 +143,7 @@ function getSequenceValue(sequence) {
     return unsure;
 }
 
-function evaluatePlay(nextId) {
+function evaluateMove(nextId) {
     return getSequenceValue([...game, nextId]);
 }
 
@@ -167,9 +178,9 @@ document.addEventListener('DOMContentLoaded', function() {
             localStorage.setItem(game, secondPlayer);
             return winning;
         }
-        const notLosings = possibleIds.filter(id => !losings.has(id));
+        const notLosings = possibleIds.filter(id => !losings.has(id) && evaluateMove(id) != firstPlayer);
         if (notLosings.length >= 1) {
-            return pick(argsMin(notLosings, evaluatePlay));
+            return pickWeighted(notLosings.map(_ => {return {move: _, weight: otherPlayer(evaluateMove(_))};})).move;
         }
         localStorage.setItem(game, firstPlayer);
         localStorage.setItem(gam, firstPlayer);
@@ -181,24 +192,10 @@ document.addEventListener('DOMContentLoaded', function() {
         current = tmp;
         currentId = getNodeId(current);
         game.push(currentId);
-        let ellipse = current.querySelector('ellipse + ellipse')
-        ellipse.setAttribute('fill', 'gray');
+        updateSvgCurrentVertex();
         if (last !== undefined) {
             const lastId = getNodeId(last);
-            document.querySelectorAll(`g._${lastId}`).forEach(g => {
-                if (g.getAttribute('class').includes(`_${currentId}`)) {
-                    g.querySelector('path').setAttribute('stroke', 'lightgray');
-                } else if(game.length < 3 || !g.getAttribute('class').includes(`_${game[game.length - 3]}`)) {
-                    g.remove();
-                }
-            });
-            const lastCircle = last.querySelector('ellipse + ellipse');
-            lastCircle.setAttribute('stroke', 'lightgray');
-            lastCircle.setAttribute('fill', 'none');
-            if (game.length === 2) {
-                lastCircle.setAttribute('stroke-width', '3');
-            }
-            last.querySelector('text').setAttribute('style', 'fill: lightgray;');
+            updateSvgLastVertex(lastId);
             winnings.clear();
             losings.clear();
             nextss = nextss.map((nexts, iNexts) => {
@@ -208,12 +205,30 @@ document.addEventListener('DOMContentLoaded', function() {
         possibleIds = [...nextss[currentId]];
         nextss[currentId] = [];
         if (possibleIds.length === 0) {
-            // the values are: 1 if the first player wins, 0 if the second player wins.
-            // As the bot always plays second, 0 are winning games, 1 are losing games.
-            localStorage.setItem(game, getLastPlayer(game));
-            localStorage.setItem(game.slice(0, game.length -1), getLastPlayer(game));
             evaluateSubsequences(game);
         }
+    }
+
+    function updateSvgCurrentVertex() {
+        let ellipse = current.querySelector('ellipse + ellipse');
+        ellipse.setAttribute('fill', 'gray');
+    }
+
+    function updateSvgLastVertex(lastId) {
+        document.querySelectorAll(`g._${lastId}`).forEach(g => {
+            if (g.getAttribute('class').includes(`_${currentId}`)) {
+                g.querySelector('path').setAttribute('stroke', 'lightgray');
+            } else if (game.length < 3 || !g.getAttribute('class').includes(`_${game[game.length - 3]}`)) {
+                g.remove();
+            }
+        });
+        const lastCircle = last.querySelector('ellipse + ellipse');
+        lastCircle.setAttribute('stroke', 'lightgray');
+        lastCircle.setAttribute('fill', 'none');
+        if (game.length === 2) {
+            lastCircle.setAttribute('stroke-width', '3');
+        }
+        last.querySelector('text').setAttribute('style', 'fill: lightgray;');
     }
 
     document.body.onclick = (event) => {
@@ -228,4 +243,5 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 });
+
 
