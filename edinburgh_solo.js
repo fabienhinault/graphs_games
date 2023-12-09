@@ -1,14 +1,7 @@
 "use strict";
 
-//deep clone
-let initialNextss = JSON.parse(JSON.stringify(nextss));
-let last;
+let previous;
 let current;
-let currentId;
-let possibleIds;
-let winnings = new Set();
-let losings = new Set();
-const game = [];
 const firstPlayer = 1000;
 const secondPlayer = 0;
 const probableFirstPlayer = 750;
@@ -32,20 +25,6 @@ function getRandomInt(min, max) {
 function pick(array) {
     return array[getRandomInt(0, array.length)];
 }
-
-function pickWeighted(weighteds) {
-    const summedWeights = weighteds.reduce((acc, cur) => {
-        acc.push((acc[acc.length - 1] ?? 0) + cur.weight);
-        return acc;
-    }, []);
-    const r = Math.random() * summedWeights[summedWeights.length - 1];
-    return weighteds[summedWeights.findIndex(aw => aw >= r)];
-}
-
-function getNodeId(node) {
-    return node.id.substring(2);
-}
-
 function min(array, f) {
     return array.reduce((acc, cur) => {
         const currentValue = f(cur);
@@ -78,18 +57,6 @@ function argsMin(array, f) {
     return min(array, f).elements;
 }
 
-function getLastPlayer(game) {
-    return game.length % 2 * firstPlayer;
-}
-
-function otherPlayer(player) {
-    return firstPlayer - player;
-}
-
-function probablePlayer(player) {
-    return (unsure + player) / 2;
-}
-
 function sum(array) {
     return array.reduce((acc, cur) => acc + cur);
 }
@@ -98,53 +65,158 @@ function average(array) {
     return sum(array) / array.length;
 }
 
-function evaluateSequence(sequence) {
-    const lastMove = sequence[sequence.length - 1];
-    // player who just played last
-    const lastPlayer = getLastPlayer(sequence);
-    const nextPlayer = otherPlayer(lastPlayer);
-    const nexts = initialNextss[lastMove].filter(_ => !sequence.includes(_));
-    const nextsValues = new Set(nexts.map(next => getSequenceValue([...sequence, next])));
-    if (nextsValues.has(nextPlayer)) {
-        return nextPlayer;
+function pickWeighted(weighteds) {
+    const summedWeights = weighteds.reduce((acc, cur) => {
+        acc.push((acc[acc.length - 1] ?? 0) + cur.weight);
+        return acc;
+    }, []);
+    const r = Math.random() * summedWeights[summedWeights.length - 1];
+    return weighteds[summedWeights.findIndex(aw => aw >= r)];
+}
+
+class Game {
+    constructor(nextss, sequenceValueStorage) {
+        this.nextss = nextss;
+        this.moves = [];
+        this.possibleNexts = undefined;
+        this.winnings = new Set();
+        this.losings = new Set();
+        this.initialNextss = JSON.parse(JSON.stringify(nextss));
+        this.sequenceValueStorage= sequenceValueStorage;
     }
-    if (nextsValues.has(lastPlayer)) {
-        if (nextsValues.size === 1) {
-            return lastPlayer;
+
+    getCurrentMove() {
+        return this.moves[this.moves.length - 1];
+    }
+
+    getPreviousMove() {
+        return this.moves[this.moves.length - 2];
+    }
+
+    getCurrentPlayer(moves) {
+        return moves.length % 2 * firstPlayer;
+    }
+
+    evaluateSequence(sequence) {
+        const lastMove = sequence[sequence.length - 1];
+        // player who just played last move
+        const lastPlayer = getLastPlayer(sequence);
+        const nextPlayer = otherPlayer(lastPlayer);
+        const nexts = this.initialNextss[lastMove].filter(_ => !sequence.includes(_));
+        const nextsValues = new Set(nexts.map(next => this.getSequenceValue([...sequence, next])));
+        if (nextsValues.has(nextPlayer)) {
+            return nextPlayer;
+        }
+        if (nextsValues.has(lastPlayer)) {
+            if (nextsValues.size === 1) {
+                return lastPlayer;
+            } else {
+                return probablePlayer(lastPlayer);
+            }
+        }
+        const entry = average([...nextsValues])
+        if (!sequenceValuesMap.has(entry)) {
+            throw new Error('absent nextsValues', entry);
+        }
+        return sequenceValuesMap.get(entry);
+    }
+
+    evaluateAllSubsequences() {
+        this.sequenceValueStorage.storeValue(this.moves, getLastPlayer(this.moves));
+        this.sequenceValueStorage.storeValue(this.moves.slice(0, this.moves.length -1), getLastPlayer(this.moves));
+        range(this.moves.length - 2, 1).reverse().map(_ => this.moves.slice(0, _)).forEach((subsequence) => {
+            const value = this.evaluateSequence(subsequence);
+            if (value !== unsure) {
+                this.sequenceValueStorage.storeValue(subsequence, value);
+            } else {
+                this.sequenceValueStorage.removeValue(subsequence);
+            }
+        });
+    }
+
+    getSequenceValue(sequence) {
+        const storedValue = this.sequenceValueStorage.getValue(sequence);
+        if (storedValue !== null && storedValue !== undefined) {
+            return Number(storedValue);
+        }
+        return unsure;
+    }
+
+    // choose best next move for bot who plays second
+    chooseNext() {
+        const gam = this.moves.slice(0, this.moves.length -1);
+        const winning = this.possibleNexts.find(id => this.winnings.has(id));
+        if (winning) {
+            this.sequenceValueStorage.storeValue(this.moves, secondPlayer);
+            return winning;
+        }
+        const notLosings = this.possibleNexts.filter(id => !this.losings.has(id) && this.evaluateMove(id) != firstPlayer);
+        if (notLosings.length >= 1) {
+            const weighteds = notLosings.map(move => {
+                return {move, weight: otherPlayer(this.evaluateMove(move))};
+            });
+            return (pickWeighted(weighteds)).move;
         } else {
-            return probablePlayer(lastPlayer);
+            this.sequenceValueStorage.storeValue(this.moves, firstPlayer);
+            this.sequenceValueStorage.storeValue(gam, firstPlayer);
+            return pick(this.possibleNexts);
         }
     }
-    const entry = average([...nextsValues])
-    if (!sequenceValuesMap.has(entry)) {
-        throw new Error('absent nextsValues', entry);
-    }
-    return sequenceValuesMap.get(entry);
-}
 
-function evaluateSubsequences(sequence) {
-    localStorage.setItem(game, getLastPlayer(game));
-    localStorage.setItem(game.slice(0, game.length -1), getLastPlayer(game));
-    range(sequence.length - 1, 1).reverse().map(_ => sequence.slice(0, _)).forEach((subsequence) => {
-        const value = evaluateSequence(subsequence);
-        if (value !== unsure) {
-            localStorage.setItem(subsequence, value);
-        } else {
-            localStorage.removeItem(subsequence);
+    // add winnings and losings while updating nextss
+    takeWinnings(nexts, iNexts) {
+        if (iNexts != this.getCurrentMove() && nexts.length === 1) {
+            this.winnings.add(iNexts.toString());
+            this.losings.add(nexts[0]);
         }
-    });
-}
-
-function getSequenceValue(sequence) {
-    const storedValue = localStorage.getItem(sequence);
-    if (storedValue !== null) {
-        return Number(storedValue);
+        return nexts
     }
-    return unsure;
+
+    play(current) {
+        this.moves.push(current);
+        const previous = this.getPreviousMove(); 
+        if (previous !== undefined) {
+            this.winnings.clear();
+            this.losings.clear();
+            this.nextss = this.nextss.map((nexts, iNexts) => {
+                return this.takeWinnings(nexts.filter(next => next !== previous), iNexts);
+            });
+        }
+        this.possibleNexts = [...this.nextss[current]];
+        this.nextss[current] = [];
+        if (this.possibleNexts.length === 0) {
+            // the game is over
+            this.evaluateAllSubsequences();
+        }
+    }
+
+    evaluateMove(nextId) {
+        return this.getSequenceValue([...this.moves, nextId]);
+    }
 }
 
-function evaluateMove(nextId) {
-    return getSequenceValue([...game, nextId]);
+class LocalStorageSequenceValueStorage {
+    storeValue(sequence, value) {
+        localStorage.setItem(sequence, value);
+    }
+    getValue(sequence) {
+        return localStorage.getItem(sequence);
+    }
+    removeValue(sequence) {
+        localStorage.removeItem(sequence);
+    }
+}
+
+function getLastPlayer(moves) {
+    return moves.length % 2 * firstPlayer;
+}
+
+function otherPlayer(player) {
+    return firstPlayer - player;
+}
+
+function probablePlayer(player) {
+    return (unsure + player) / 2;
 }
 
 function enlargeVertices() {
@@ -161,51 +233,20 @@ function enlargeVertices() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    const game = new Game(nextss, new LocalStorageSequenceValueStorage());
     enlargeVertices();
-    // add winnings and losings while updating nextss
-    function takeWinnings(nexts, iNexts) {
-        if (iNexts != currentId && nexts.length === 1) {
-            winnings.add(iNexts.toString());
-            losings.add(nexts[0]);
-        }
-        return nexts
-    }
 
-    function chooseNext() {
-        const gam = game.slice(0, game.length -1);
-        const winning = possibleIds.find(id => winnings.has(id));
-        if (winning) {
-            localStorage.setItem(game, secondPlayer);
-            return winning;
-        }
-        const notLosings = possibleIds.filter(id => !losings.has(id) && evaluateMove(id) != firstPlayer);
-        if (notLosings.length >= 1) {
-            return pickWeighted(notLosings.map(_ => {return {move: _, weight: otherPlayer(evaluateMove(_))};})).move;
-        }
-        localStorage.setItem(game, firstPlayer);
-        localStorage.setItem(gam, firstPlayer);
-        return pick(possibleIds);
+    function getNodeId(node) {
+        return node.id.substring(2);
     }
 
     function play(tmp) {
-        last = current;
+        previous = current;
         current = tmp;
-        currentId = getNodeId(current);
-        game.push(currentId);
+        game.play(getNodeId(current));
         updateSvgCurrentVertex();
-        if (last !== undefined) {
-            const lastId = getNodeId(last);
-            updateSvgLastVertex(lastId);
-            winnings.clear();
-            losings.clear();
-            nextss = nextss.map((nexts, iNexts) => {
-                return takeWinnings(nexts.filter(next => next !== lastId), iNexts);
-            });
-        }
-        possibleIds = [...nextss[currentId]];
-        nextss[currentId] = [];
-        if (possibleIds.length === 0) {
-            evaluateSubsequences(game);
+        if (previous !== undefined) {
+            updateSvgLastVertex(previous);
         }
     }
 
@@ -214,29 +255,29 @@ document.addEventListener('DOMContentLoaded', function() {
         ellipse.setAttribute('fill', 'gray');
     }
 
-    function updateSvgLastVertex(lastId) {
-        document.querySelectorAll(`g._${lastId}`).forEach(g => {
-            if (g.getAttribute('class').includes(`_${currentId}`)) {
+    function updateSvgLastVertex(previous) {
+        document.querySelectorAll(`g._${game.getPreviousMove()}`).forEach(g => {
+            if (g.getAttribute('class').includes(`_${game.getCurrentMove()}`)) {
                 g.querySelector('path').setAttribute('stroke', 'lightgray');
-            } else if (game.length < 3 || !g.getAttribute('class').includes(`_${game[game.length - 3]}`)) {
+            } else if (game.moves.length < 3 || !g.getAttribute('class').includes(`_${game.moves[game.moves.length - 3]}`)) {
                 g.remove();
             }
         });
-        const lastCircle = last.querySelector('ellipse + ellipse');
+        const lastCircle = previous.querySelector('ellipse + ellipse');
         lastCircle.setAttribute('stroke', 'lightgray');
         lastCircle.setAttribute('fill', 'none');
-        if (game.length === 2) {
+        if (game.moves.length === 2) {
             lastCircle.setAttribute('stroke-width', '3');
         }
-        last.querySelector('text').setAttribute('style', 'fill: lightgray;');
+        previous.querySelector('text').setAttribute('style', 'fill: lightgray;');
     }
 
     document.body.onclick = (event) => {
         const tmp = event.target.closest('svg > g > g.node');
-        if (tmp && (possibleIds === undefined || possibleIds.includes(getNodeId(tmp)))) {
+        if (tmp && (game.possibleNexts === undefined || game.possibleNexts.includes(getNodeId(tmp)))) {
             play(tmp);
-            if (possibleIds.length > 0) {
-                const botChoice = chooseNext();
+            if (game.possibleNexts.length > 0) {
+                const botChoice = game.chooseNext();
                 const botElement = document.querySelector(`g#id${botChoice}`);
                 setTimeout(() => {play(botElement);}, 1000);
             }
