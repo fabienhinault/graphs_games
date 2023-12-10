@@ -530,16 +530,21 @@ node [shape=circle style=filled fillcolor=gray99]
            (list "}
 "))))
 
-(define (graph-name g)
-  (string-replace
-   (string-replace
-    (string-replace
-     (bytes->string/utf-8 (base64-encode (list->bytes (flatten g)) ""))
-     "+" "-")
-    "/" "_")
-   "=" ""))
+(define A (char->integer #\A))
+(define a (char->integer #\a))
+(define _0 (char->integer #\0))
 
-(check-equal? (graph-name '((0 1) (0 2))) "AAEAAg")
+(define (number->base64 n)
+  (cond ((< n 26) (integer->char (+ n A)))
+        ((< n 52) (integer->char (+ (- n 26) a)))
+        ((< n 62) (integer->char (+ (- n 52) _0)))
+        ((equal? n 62) #\-)
+        ((equal? n 63) #\_)))
+
+(define (graph-name g)
+  (list->string (map number->base64 (flatten g))))
+
+(check-equal? (graph-name '((0 1) (0 2))) "ABAC")
 
 (define (make-directory-and-parents dir)
   (when (not (directory-exists? dir))
