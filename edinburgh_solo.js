@@ -144,21 +144,26 @@ class Game {
 
     // choose best next move for bot who plays second
     chooseNext() {
-        const gam = this.moves.slice(0, this.moves.length -1);
+        console.debug('this.possibleNexts', this.possibleNexts);
+        console.debug('this.winnings', this.winnings);
         const winning = this.possibleNexts.find(id => this.winnings.has(id));
+        console.debug('winning', winning);
         if (winning) {
             this.sequenceValueStorage.storeValue(this.moves, secondPlayer);
             return winning;
         }
+        console.debug('this.losings', this.losings);
         const notLosings = this.possibleNexts.filter(id => !this.losings.has(id) && this.evaluateMove(id) != firstPlayer);
+        console.debug('notLosings', notLosings);
         if (notLosings.length >= 1) {
             const weighteds = notLosings.map(move => {
                 return {move, weight: otherPlayer(this.evaluateMove(move))};
             });
+            console.debug('weighteds', weighteds);
             return (pickWeighted(weighteds)).move;
         } else {
             this.sequenceValueStorage.storeValue(this.moves, firstPlayer);
-            this.sequenceValueStorage.storeValue(gam, firstPlayer);
+            this.sequenceValueStorage.storeValue(this.moves.slice(0, this.moves.length -1), firstPlayer);
             return pick(this.possibleNexts);
         }
     }
@@ -167,9 +172,19 @@ class Game {
     takeWinnings(nexts, iNexts) {
         if (iNexts != this.getCurrentMove() && nexts.length === 1) {
             this.winnings.add(iNexts.toString());
-            this.losings.add(nexts[0]);
+            let prevVertex = iNexts;
+            let curVertex = nexts[0];
+            let vertices = this.losings;
+            while ((this.nextss[curVertex].length === 2) && (curVertex != this.getCurrentMove())) {
+                vertices.add(curVertex);
+                const nextVertex = this.nextss[curVertex].find(_ => _ != prevVertex);
+                prevVertex = curVertex;
+                curVertex = nextVertex;
+                vertices = [this.winnings, this.losings].find (_ => _ !== vertices);
+            }
+            vertices.add(curVertex);
         }
-        return nexts
+        return nexts;
     }
 
     play(current) {
@@ -179,9 +194,11 @@ class Game {
             this.winnings.clear();
             this.losings.clear();
             this.nextss = this.nextss.map((nexts, iNexts) => {
-                return this.takeWinnings(nexts.filter(next => next !== previous), iNexts);
+                return this.takeWinnings(nexts.filter(next => next != previous), iNexts);
             });
         }
+        // a vertex both winning and losing is actually losing
+        this.losings.forEach(losing => this.winnings.delete(losing));
         this.possibleNexts = [...this.nextss[current]];
         this.nextss[current] = [];
         if (this.possibleNexts.length === 0) {
