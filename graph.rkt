@@ -514,10 +514,10 @@
     (~a v " [id=\"id" v "\"]" #\newline))
 
 (define (edge-dot e)
-  (~a (car e) " -- " (cadr e) " [class=\"_" (car e) " _" (cadr e)  "\"]" #\newline))
+  (~a (car e) " -- " (cadr e) " [class=\"_" (car e) "_ _" (cadr e)  "_\"]" #\newline))
 
 (check-equal?
- (edge-dot '(a z)) "a -- z [class=\"_a _z\"]
+ (edge-dot '(a z)) "a -- z [class=\"_a_ _z_\"]
 ")
 
 (define (graph-dot g vertices)
@@ -530,14 +530,14 @@ node [shape=circle style=filled fillcolor=gray99]
            (list "}
 "))))
 
-(define A (char->integer #\A))
-(define a (char->integer #\a))
-(define _0 (char->integer #\0))
+(define A0 (char->integer #\A))
+(define a26 (- (char->integer #\a) 26))
+(define _052 (- (char->integer #\0) 52))
 
 (define (number->base64 n)
-  (cond ((< n 26) (integer->char (+ n A)))
-        ((< n 52) (integer->char (+ (- n 26) a)))
-        ((< n 62) (integer->char (+ (- n 52) _0)))
+  (cond ((< n 26) (integer->char (+ n A0)))
+        ((< n 52) (integer->char (+ n a26)))
+        ((< n 62) (integer->char (+ n _052)))
         ((equal? n 62) #\-)
         ((equal? n 63) #\_)))
 
