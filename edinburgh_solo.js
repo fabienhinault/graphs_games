@@ -25,37 +25,6 @@ function getRandomInt(min, max) {
 function pick(array) {
     return array[getRandomInt(0, array.length)];
 }
-function min(array, f) {
-    return array.reduce((acc, cur) => {
-        const currentValue = f(cur);
-        if (currentValue < acc.value) {
-            return {elements: [cur], value: currentValue};
-        } else if (currentValue === acc.value) {
-            return {elements: [...acc.elements, cur], value: currentValue};
-        } else {
-            return acc;
-        }
-    },
-    {value: Number.MAX_VALUE});
-}
-
-function max(array, f) {
-    return array.reduce((acc, cur) => {
-        const currentValue = f(cur);
-        if (currentValue > acc.value) {
-            return {elements: [cur], value: currentValue};
-        } else if (currentValue === acc.value) {
-            return {elements: [...acc.elements, cur], value: currentValue};
-        } else {
-            return acc;
-        }
-    },
-    {value: -Number.MAX_VALUE});
-}
-
-function argsMin(array, f) {
-    return min(array, f).elements;
-}
 
 function sum(array) {
     return array.reduce((acc, cur) => acc + cur);
@@ -170,9 +139,13 @@ class Game {
 
     // add winnings and losings while updating nextss
     takeWinnings(nexts, iNexts) {
+        const strINexts =iNexts.toString();
+        if (nexts.length === 0 && this.nextss[this.getCurrentMove()].includes(strINexts)) {
+            this.winnings.add(strINexts);
+        }
         if (iNexts != this.getCurrentMove() && nexts.length === 1) {
-            this.winnings.add(iNexts.toString());
-            let prevVertex = iNexts;
+            this.winnings.add(strINexts);
+            let prevVertex = strINexts;
             let curVertex = nexts[0];
             let vertices = this.losings;
             while ((this.nextss[curVertex].length === 2) && (curVertex != this.getCurrentMove())) {
@@ -189,17 +162,14 @@ class Game {
 
     play(current) {
         this.moves.push(current);
-        const previous = this.getPreviousMove(); 
-        if (previous !== undefined) {
-            this.winnings.clear();
-            this.losings.clear();
-            this.nextss = this.nextss.map((nexts, iNexts) => {
-                return this.takeWinnings(nexts.filter(next => next != previous), iNexts);
-            });
-        }
+        this.possibleNexts = [...this.nextss[current]];
+        this.winnings.clear();
+        this.losings.clear();
+        this.nextss = this.nextss.map((nexts, iNexts) => {
+            return this.takeWinnings(nexts.filter(next => next != current), iNexts);
+        });
         // a vertex both winning and losing is actually losing
         this.losings.forEach(losing => this.winnings.delete(losing));
-        this.possibleNexts = [...this.nextss[current]];
         this.nextss[current] = [];
         if (this.possibleNexts.length === 0) {
             // the game is over
