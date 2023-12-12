@@ -243,10 +243,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateSvgLastVertex(previous) {
-        document.querySelectorAll(`g._${game.getPreviousMove()}`).forEach(g => {
-            if (g.getAttribute('class').includes(`_${game.getCurrentMove()}`)) {
+        document.querySelectorAll(`g._${game.getPreviousMove()}_`).forEach(g => {
+            if (g.getAttribute('class').includes(`_${game.getCurrentMove()}_`)) {
                 g.querySelector('path').setAttribute('stroke', 'lightgray');
-            } else if (game.moves.length < 3 || !g.getAttribute('class').includes(`_${game.moves[game.moves.length - 3]}`)) {
+            } else if (game.moves.length < 3 || !g.getAttribute('class').includes(`_${game.moves[game.moves.length - 3]}_`)) {
                 g.remove();
             }
         });
