@@ -72,22 +72,27 @@ class Game {
         const lastPlayer = getLastPlayer(sequence);
         const nextPlayer = otherPlayer(lastPlayer);
         const nexts = this.initialNextss[lastMove].filter(_ => !sequence.includes(_));
-        const nextsValues = new Set(nexts.map(next => this.getSequenceValue([...sequence, next])));
-        if (nextsValues.has(nextPlayer)) {
+        const nextsValues = nexts.map(next => this.getSequenceValue([...sequence, next]));
+        if (nextsValues.includes(nextPlayer)) {
             return nextPlayer;
         }
-        if (nextsValues.has(lastPlayer)) {
-            if (nextsValues.size === 1) {
+        if (nextsValues.includes(lastPlayer)) {
+            if (nextsValues.length === 1) {
                 return lastPlayer;
             } else {
-                return probablePlayer(lastPlayer);
+                const nextsValuesNotLastPlayer = nextsValues.filter(_ => _ != lastPlayer);
+                return this.minmax(nextPlayer, nextsValuesNotLastPlayer) - 0.02 * (lastPlayer - unsure) * (nextsValues.length - nextsValuesNotLastPlayer.length);
             }
         }
-        const entry = average([...nextsValues])
-        if (!sequenceValuesMap.has(entry)) {
-            throw new Error('absent nextsValues', entry);
+        return this.minmax(nextPlayer, nextsValues);
+    }
+
+    minmax(nextPlayer, nextsValues) {
+        if (nextPlayer === firstPlayer) {
+            return Math.max(...nextsValues);
+        } else {
+            return Math.min(...nextsValues);
         }
-        return sequenceValuesMap.get(entry);
     }
 
     evaluateAllSubsequences() {
@@ -96,7 +101,7 @@ class Game {
         range(this.moves.length - 2, 1).reverse().map(_ => this.moves.slice(0, _)).forEach((subsequence) => {
             const value = this.evaluateSequence(subsequence);
             if (value !== unsure) {
-                this.sequenceValueStorage.storeValue(subsequence, value);
+              this.sequenceValueStorage.storeValue(subsequence, value);
             } else {
                 this.sequenceValueStorage.removeValue(subsequence);
             }
@@ -139,25 +144,28 @@ class Game {
 
     // add winnings and losings while updating nextss
     takeWinnings(nexts, iNexts) {
-        const strINexts =iNexts.toString();
-        if (nexts.length === 0 && this.nextss[this.getCurrentMove()].includes(strINexts)) {
-            this.winnings.add(strINexts);
-        }
-        if (iNexts != this.getCurrentMove() && nexts.length === 1) {
-            this.winnings.add(strINexts);
-            let prevVertex = strINexts;
-            let curVertex = nexts[0];
-            let vertices = this.losings;
-            while ((this.nextss[curVertex].length === 2) && (curVertex != this.getCurrentMove())) {
-                vertices.add(curVertex);
-                const nextVertex = this.nextss[curVertex].find(_ => _ != prevVertex);
-                prevVertex = curVertex;
-                curVertex = nextVertex;
-                vertices = [this.winnings, this.losings].find (_ => _ !== vertices);
+        if (iNexts != this.getCurrentMove()) {
+            const strINexts =iNexts.toString();
+            const inCurrentNexts = this.nextss[this.getCurrentMove()].includes(strINexts);
+            if (nexts.length === 0 && inCurrentNexts) {
+                this.winnings.add(strINexts);
             }
-            vertices.add(curVertex);
+            if (nexts.length === 1 && !inCurrentNexts) {
+                this.winnings.add(strINexts);
+                let prevVertex = strINexts;
+                let curVertex = nexts[0];
+                let vertices = this.losings;
+                while ((this.nextss[curVertex].length === 2) && (curVertex != this.getCurrentMove())) {
+                    vertices.add(curVertex);
+                    const nextVertex = this.nextss[curVertex].find(_ => _ != prevVertex);
+                    prevVertex = curVertex;
+                    curVertex = nextVertex;
+                    vertices = [this.winnings, this.losings].find (_ => _ !== vertices);
+                }
+                vertices.add(curVertex);
+            }
+            return nexts;
         }
-        return nexts;
     }
 
     play(current) {

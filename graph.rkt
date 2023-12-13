@@ -675,15 +675,16 @@ node [shape=circle style=filled fillcolor=gray99]
                (get-graph-degree-1-vertices graph vertices))))
 
 (define (create-random-edinburgh-graph vertices nb-edges)
-  (rewrite-graph
-   (rec-rename-graph-vertices
-    (rewrite-graph 
-     (rec-connect-graph
-      (make-all-vertices-degree2
-       (add-absent-vertices (random-graph vertices nb-edges) vertices)
-       vertices)
-      (list->set vertices)))
-    (make-hash) (new-name-numeric-generator))))
+  (remove-duplicates
+   (rewrite-graph
+    (rec-rename-graph-vertices
+     (rewrite-graph 
+      (rec-connect-graph
+       (make-all-vertices-degree2
+        (add-absent-vertices (random-graph vertices nb-edges) vertices)
+        vertices)
+       (list->set vertices)))
+     (make-hash) (new-name-numeric-generator))))
 
 (define (write-random-edinburgh-dot nb-vertices nb-edges)
   (let* ((vertices (range nb-vertices))
