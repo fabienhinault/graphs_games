@@ -77,11 +77,13 @@ class Game {
             return nextPlayer;
         }
         if (nextsValues.includes(lastPlayer)) {
-            if (nextsValues.length === 1) {
+            const nextsValuesNotLastPlayer = nextsValues.filter(_ => _ != lastPlayer);
+            if (nextsValuesNotLastPlayer.length === 0) {
                 return lastPlayer;
             } else {
-                const nextsValuesNotLastPlayer = nextsValues.filter(_ => _ != lastPlayer);
-                return this.minmax(nextPlayer, nextsValuesNotLastPlayer) - 0.02 * (lastPlayer - unsure) * (nextsValues.length - nextsValuesNotLastPlayer.length);
+                // some moves are winning for lastPlayer, but nextPlayer is unlikely to play them.
+                // just add a few points for lastPlayer.
+                return this.minmax(nextPlayer, nextsValuesNotLastPlayer) + 0.02 * (lastPlayer - unsure) * (nextsValues.length - nextsValuesNotLastPlayer.length);
             }
         }
         return this.minmax(nextPlayer, nextsValues);
@@ -120,7 +122,8 @@ class Game {
     chooseNext() {
         console.debug('this.possibleNexts', this.possibleNexts);
         console.debug('this.winnings', this.winnings);
-        const winning = this.possibleNexts.find(id => this.winnings.has(id));
+        // check stored value to prevent false winning
+        const winning = this.possibleNexts.find(id => this.winnings.has(id) && this.sequenceValueStorage.getValue([...this.moves, id]) != firstPlayer);
         console.debug('winning', winning);
         if (winning) {
             this.sequenceValueStorage.storeValue(this.moves, secondPlayer);
@@ -136,8 +139,7 @@ class Game {
             console.debug('weighteds', weighteds);
             return (pickWeighted(weighteds)).move;
         } else {
-            this.sequenceValueStorage.storeValue(this.moves, firstPlayer);
-            this.sequenceValueStorage.storeValue(this.moves.slice(0, this.moves.length -1), firstPlayer);
+            this.possibleNexts.forEach(next => this.sequenceValueStorage.storeValue([...this.moves, next], firstPlayer));
             return pick(this.possibleNexts);
         }
     }
