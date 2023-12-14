@@ -115,17 +115,17 @@ describe('edinburgh_solo', function () {
                 ["9","6","4","11","5"],["10","9"],["10","7","6","12","8"],["9","14","1","8"],["7","14","12"],["9","11","3"],
                 ["14","4","3"],["10","13","11"]],
             new MemorySequenceValueStorage());
-            game.sequenceValueStorage.storeValue([5,6,7,4,13,14,11,12,9,10], firstPlayer);
-            game.play("5");
-            game.play("6");
-            game.play("7");
-            game.play("4");
-            game.play("13");
-            game.play("14");
-            game.play("11");
-            game.play("12");
-            game.play("9");
-            assert.equal(game.chooseNext(), "8");
+        game.sequenceValueStorage.storeValue([5,6,7,4,13,14,11,12,9,10], firstPlayer);
+        game.play("5");
+        game.play("6");
+        game.play("7");
+        game.play("4");
+        game.play("13");
+        game.play("14");
+        game.play("11");
+        game.play("12");
+        game.play("9");
+        assert.equal(game.chooseNext(), "8");
     });
 
 
