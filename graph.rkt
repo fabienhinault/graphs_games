@@ -684,7 +684,7 @@ node [shape=circle style=filled fillcolor=gray99]
         (add-absent-vertices (random-graph vertices nb-edges) vertices)
         vertices)
        (list->set vertices)))
-     (make-hash) (new-name-numeric-generator))))
+     (make-hash) (new-name-numeric-generator)))))
 
 (define (write-random-edinburgh-dot nb-vertices nb-edges)
   (let* ((vertices (range nb-vertices))

@@ -118,19 +118,26 @@ class Game {
         return unsure;
     }
 
-    // choose best next move for bot who plays second
-    chooseNext() {
+    evaluateNexts() {
         console.debug('this.possibleNexts', this.possibleNexts);
         console.debug('this.winnings', this.winnings);
-        // check stored value to prevent false winning
-        const winning = this.possibleNexts.find(id => this.winnings.has(id) && this.sequenceValueStorage.getValue([...this.moves, id]) != firstPlayer);
+        // check stored value to prevent false winnings
+        const winningNexts = this.possibleNexts.filter(id =>
+            this.winnings.has(id) && this.sequenceValueStorage.getValue([...this.moves, id]) != firstPlayer);
+        winningNexts.forEach(next => this.sequenceValueStorage.storeValue([...this.moves, next], secondPlayer));
+        console.debug('this.losings', this.losings);
+        const losingNexts = this.possibleNexts.filter(id => this.losings.has(id));
+        losingNexts.forEach(next => this.sequenceValueStorage.storeValue([...this.moves, next], firstPlayer));
+    }
+
+    // choose best next move for bot who plays second
+    chooseNext() {
+        const winning = this.possibleNexts.find(id => this.evaluateMove(id) <= probableSecondPlayer);
         console.debug('winning', winning);
         if (winning) {
-            this.sequenceValueStorage.storeValue(this.moves, secondPlayer);
             return winning;
         }
-        console.debug('this.losings', this.losings);
-        const notLosings = this.possibleNexts.filter(id => !this.losings.has(id) && this.evaluateMove(id) != firstPlayer);
+        const notLosings = this.possibleNexts.filter(id => this.evaluateMove(id) <= probableFirstPlayer);
         console.debug('notLosings', notLosings);
         if (notLosings.length >= 1) {
             const weighteds = notLosings.map(move => {
@@ -139,7 +146,6 @@ class Game {
             console.debug('weighteds', weighteds);
             return (pickWeighted(weighteds)).move;
         } else {
-            this.possibleNexts.forEach(next => this.sequenceValueStorage.storeValue([...this.moves, next], firstPlayer));
             return pick(this.possibleNexts);
         }
     }
@@ -274,6 +280,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tmp && (game.possibleNexts === undefined || game.possibleNexts.includes(getNodeId(tmp)))) {
             play(tmp);
             if (game.possibleNexts.length > 0) {
+                game.evaluateNexts();
                 const botChoice = game.chooseNext();
                 const botElement = document.querySelector(`g#id${botChoice}`);
                 setTimeout(() => {play(botElement);}, 1000);
