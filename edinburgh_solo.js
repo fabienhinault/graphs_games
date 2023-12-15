@@ -44,14 +44,19 @@ function pickWeighted(weighteds) {
 }
 
 class Game {
-    constructor(nextss, sequenceValueStorage) {
+    constructor(nextss, initialNextss, sequenceValueStorage) {
         this.nextss = nextss;
         this.moves = [];
         this.possibleNexts = undefined;
         this.winnings = new Set();
         this.losings = new Set();
-        this.initialNextss = JSON.parse(JSON.stringify(nextss));
+        this.initialNextss = initialNextss;
         this.sequenceValueStorage= sequenceValueStorage;
+    }
+    
+    copy() {
+        const result = new Game([...this.nextss.map(_ => [..._])], this.initialNextss, this.sequenceValueStorage);
+        result.moves = [...this.moves];
     }
 
     getCurrentMove() {
@@ -236,7 +241,7 @@ function enlargeVertices() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    const game = new Game(nextss, new LocalStorageSequenceValueStorage());
+    const game = new Game(nextss, JSON.parse(JSON.stringify(nextss)), new LocalStorageSequenceValueStorage());
     enlargeVertices();
 
     function getNodeId(node) {
