@@ -83,11 +83,34 @@
                                        (r)
                                        ()))
 
+; partitions of l having nb elements
+(define (rec-parts-w/nb l nb)
+    (cond ((or (< (length l) nb) (< nb 0)) '())
+          ((equal? (length l) nb)
+           (list l))
+          (else (append
+                 (map (λ (_) (cons (car l) _))
+                      (rec-parts-w/nb (cdr l) (- nb 1)))
+                 (rec-parts-w/nb (cdr l) nb)))))
+
+(check-equal? (rec-parts-w/nb '(0) 0) '(()))
+(check-equal? (rec-parts-w/nb '(0) 1) '((0)))
+(check-equal? (rec-parts-w/nb '(0) 2) '())
+(check-equal? (rec-parts-w/nb '(0 1) 1) '((0) (1)))
+(check-equal? (rec-parts-w/nb '(0 1) 2) '((0 1)))
+(check-equal? (rec-parts-w/nb '(0 1 2) 1) '((0) (1) (2)))
+(check-equal? (rec-parts-w/nb '(0 1 2) 2) '((0 1) (0 2) (1 2)))
+(check-equal? (rec-parts-w/nb '(0 1 2) 3) '((0 1 2)))
+(check-equal? (rec-parts-w/nb '(0 1 2 3) 1) '((0) (1) (2) (3)))
+(check-equal? (rec-parts-w/nb '(0 1 2 3) 2) '((0 1) (0 2) (0 3) (1 2) (1 3) (2 3)))
+(check-equal? (rec-parts-w/nb '(0 1 2 3) 3) '((0 1 2) (0 1 3) (0 2 3) (1 2 3)))
+(check-equal? (rec-parts-w/nb '(0 1 2 3) 4) '((0 1 2 3)))
+
 (define (tailrec-parts-update-result tmp-res x)
     (append
      tmp-res
      (map
-      (lambda (_) (cons x _))
+      (λ (_) (cons x _))
       tmp-res)))
 
 (check-equal? (tailrec-parts-update-result '((e) ()) 'z) '((e) () (z e) (z)))
@@ -116,6 +139,49 @@
                                                  (r e z)
                                                  (r e z a)))
 
+(define (take-if-more l nb)
+  (let ((len (length l)))
+    (if (<= len nb)
+        l
+        (take l nb))))
+
+; tmp-res is a list of lists of partial lists
+(define (tailrec-parts-w/nb-update-result lll x nb+1)
+  (map append
+       lll
+       (take-if-more (cons '() (map (λ (ll) (map (λ (l) (cons x l)) ll))
+                                    lll))
+                     nb+1)))
+
+(check-equal? (tailrec-parts-w/nb-update-result '((())) 0 1) '((())) )
+(check-equal? (tailrec-parts-w/nb-update-result '((()) ()) 0 2) '((()) ((0))) )
+ 
+(define (tailrec-parts-w/nb res l nb+1)
+    (if (null? l)
+        (last res)
+        (tailrec-parts-w/nb
+         (tailrec-parts-w/nb-update-result res (car l) nb+1)
+         (cdr l)
+         nb+1)))
+
+(check-equal? (tailrec-parts-w/nb '((()) ()) '(0) 2) '((0)))
+
+(define (parts-w/nb l nb)
+  (tailrec-parts-w/nb (cons '(()) (make-list nb '())) l (+ nb 1)))
+
+(check-equal? (parts-w/nb '(0) 0) '(()))
+(check-equal? (parts-w/nb '(0) 1) '((0)))
+(check-equal? (parts-w/nb '(0) 2) '())
+(check-equal? (parts-w/nb '(0 1) 1) '((0) (1)))
+(check-equal? (parts-w/nb '(0 1) 2) '((1 0)))
+(check-equal? (parts-w/nb '(0 1 2) 1) '((0) (1) (2)))
+(check-equal? (parts-w/nb '(0 1 2) 2) '((1 0) (2 0) (2 1)))
+(check-equal? (parts-w/nb '(0 1 2) 3) '((2 1 0)))
+(check-equal? (parts-w/nb '(0 1 2 3) 1) '((0) (1) (2) (3)))
+(check-equal? (parts-w/nb '(0 1 2 3) 2) '((1 0) (2 0) (2 1) (3 0) (3 1) (3 2)))
+(check-equal? (parts-w/nb '(0 1 2 3) 3) '((2 1 0) (3 1 0) (3 2 0) (3 2 1)))
+(check-equal? (parts-w/nb '(0 1 2 3) 4) '((3 2 1 0)))
+
 (define (graph-first-node g)
   (caar g))
 
@@ -129,6 +195,11 @@
 (check-equal?
  (graphs1 '(a e z))
  '(() ((a e)) ((a z)) ((a z) (a e)) ((e z)) ((e z) (a e)) ((e z) (a z)) ((e z) (a z) (a e))))
+
+(define (graphs11 nb-vertices nb-edges)
+  (parts-w/nb (tailrec-couples '() (range nb-vertices)) nb-edges))
+
+(check-equal? (graphs11 3 2) '(((0 2) (0 1)) ((1 2) (0 1)) ((1 2) (0 2))))
 
 (define (contains-deep? l x)
   (member x (flatten l)))
@@ -677,14 +748,15 @@ node [shape=circle style=filled fillcolor=gray99]
 (define (create-random-edinburgh-graph vertices nb-edges)
   (remove-duplicates
    (rewrite-graph
-    (rec-rename-graph-vertices
-     (rewrite-graph 
-      (rec-connect-graph
-       (make-all-vertices-degree2
-        (add-absent-vertices (random-graph vertices nb-edges) vertices)
-        vertices)
-       (list->set vertices)))
-     (make-hash) (new-name-numeric-generator)))))
+    (make-all-vertices-degree2
+     (rec-rename-graph-vertices
+      (rewrite-graph 
+       (rec-connect-graph
+        (make-all-vertices-degree2
+         (add-absent-vertices (random-graph vertices nb-edges) vertices)
+         vertices)
+        (list->set vertices)))
+      (make-hash) (new-name-numeric-generator))))))
 
 (define (write-random-edinburgh-dot nb-vertices nb-edges)
   (let* ((vertices (range nb-vertices))
