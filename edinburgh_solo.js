@@ -43,20 +43,44 @@ function pickWeighted(weighteds) {
     return weighteds[summedWeights.findIndex(aw => aw >= r)];
 }
 
+function min(array, f) {
+    return array.reduce((acc, cur) => {
+        const currentValue = f(cur);
+        if (currentValue < acc.value) {
+            return {elements: [cur], value: currentValue};
+        } else if (currentValue === acc.value) {
+            return {elements: [...acc.elements, cur], value: currentValue};
+        } else {
+            return acc;
+        }
+    },
+    {value: Number.MAX_VALUE});
+}
+
+function argsMin(array, f) {
+    return min(array, f).elements;
+}
+
+class Clock {
+    getTime() {
+        return Date.now();
+    }
+}
+
 class Game {
-    constructor(nextss, initialNextss, sequenceValueStorage) {
+    constructor(nextss, initialNextss, sequenceValueStorage, clock) {
         this.nextss = nextss;
         this.moves = [];
         this.possibleNexts = undefined;
-        this.winnings = new Set();
-        this.losings = new Set();
         this.initialNextss = initialNextss;
         this.sequenceValueStorage= sequenceValueStorage;
+        this.clock = clock;
     }
     
     copy() {
-        const result = new Game([...this.nextss.map(_ => [..._])], this.initialNextss, this.sequenceValueStorage);
+        const result = new Game([...this.nextss.map(_ => [..._])], this.initialNextss, this.sequenceValueStorage, this.clock);
         result.moves = [...this.moves];
+        return result;
     }
 
     getCurrentMove() {
@@ -78,8 +102,9 @@ class Game {
         const nextPlayer = otherPlayer(lastPlayer);
         const nexts = this.initialNextss[lastMove].filter(_ => !sequence.includes(_));
         const nextsValues = nexts.map(next => this.getSequenceValue([...sequence, next]));
-        if (nextsValues.includes(nextPlayer)) {
-            return nextPlayer;
+        const nextsValuesNotNextPlayer = nextsValues.filter(_ => Math.abs(_ - nextPlayer) > probableSecondPlayer);
+        if (nextsValuesNotNextPlayer.length < nextsValues.length) {
+            return this.minmax(nextPlayer, nextsValues) - 0.02 * (nextPlayer - unsure) * (nextsValuesNotNextPlayer.length + 1);
         }
         if (nextsValues.includes(lastPlayer)) {
             const nextsValuesNotLastPlayer = nextsValues.filter(_ => _ != lastPlayer);
@@ -123,74 +148,44 @@ class Game {
         return unsure;
     }
 
-    evaluateNexts() {
-        console.debug('this.possibleNexts', this.possibleNexts);
-        console.debug('this.winnings', this.winnings);
-        // check stored value to prevent false winnings
-        const winningNexts = this.possibleNexts.filter(id =>
-            this.winnings.has(id) && this.sequenceValueStorage.getValue([...this.moves, id]) != firstPlayer);
-        winningNexts.forEach(next => this.sequenceValueStorage.storeValue([...this.moves, next], secondPlayer));
-        console.debug('this.losings', this.losings);
-        const losingNexts = this.possibleNexts.filter(id => this.losings.has(id));
-        losingNexts.forEach(next => this.sequenceValueStorage.storeValue([...this.moves, next], firstPlayer));
+    evaluateNexts(time) {
+        if (this.clock.getTime() < time) {
+            for (let next of this.possibleNexts) {
+                const game = this.copy();
+                game.play(next);
+                setTimeout(() => game.evaluateNexts(time), 0);
+            }
+        }
     }
 
     // choose best next move for bot who plays second
     chooseNext() {
-        const winning = this.possibleNexts.find(id => this.evaluateMove(id) <= probableSecondPlayer);
-        console.debug('winning', winning);
+        const possibleNextsValues = this.possibleNexts.map(move => {return {move, value:this.getMoveValue(move)};});
+        console.debug('possibleNextsValues', possibleNextsValues);
+        const winning = possibleNextsValues.find(_ => _.value < probableSecondPlayer);
         if (winning) {
-            return winning;
+            console.debug('winning', winning);
+            return winning.move;
         }
-        const notLosings = this.possibleNexts.filter(id => this.evaluateMove(id) <= probableFirstPlayer);
+        const notLosings = possibleNextsValues.filter(_ => _.value <= probableFirstPlayer);
         console.debug('notLosings', notLosings);
         if (notLosings.length >= 1) {
-            const weighteds = notLosings.map(move => {
-                return {move, weight: otherPlayer(this.evaluateMove(move))};
+            const weighteds = notLosings.map(_ => {
+                return {move: _.move, weight: otherPlayer(_.value)};
             });
             console.debug('weighteds', weighteds);
             return (pickWeighted(weighteds)).move;
         } else {
-            return pick(this.possibleNexts);
-        }
-    }
-
-    // add winnings and losings while updating nextss
-    takeWinnings(nexts, iNexts) {
-        if (iNexts != this.getCurrentMove()) {
-            const strINexts =iNexts.toString();
-            const inCurrentNexts = this.nextss[this.getCurrentMove()].includes(strINexts);
-            if (nexts.length === 0 && inCurrentNexts) {
-                this.winnings.add(strINexts);
-            }
-            if (nexts.length === 1 && !inCurrentNexts) {
-                this.winnings.add(strINexts);
-                let prevVertex = strINexts;
-                let curVertex = nexts[0];
-                let vertices = this.losings;
-                while ((this.nextss[curVertex].length === 2) && (curVertex != this.getCurrentMove())) {
-                    vertices.add(curVertex);
-                    const nextVertex = this.nextss[curVertex].find(_ => _ != prevVertex);
-                    prevVertex = curVertex;
-                    curVertex = nextVertex;
-                    vertices = [this.winnings, this.losings].find (_ => _ !== vertices);
-                }
-                vertices.add(curVertex);
-            }
-            return nexts;
+            return pick(argsMin(possibleNextsValues, _ => _.value)).move;
         }
     }
 
     play(current) {
         this.moves.push(current);
         this.possibleNexts = [...this.nextss[current]];
-        this.winnings.clear();
-        this.losings.clear();
         this.nextss = this.nextss.map((nexts, iNexts) => {
-            return this.takeWinnings(nexts.filter(next => next != current), iNexts);
+            return nexts.filter(next => next != current);
         });
-        // a vertex both winning and losing is actually losing
-        this.losings.forEach(losing => this.winnings.delete(losing));
         this.nextss[current] = [];
         if (this.possibleNexts.length === 0) {
             // the game is over
@@ -198,7 +193,7 @@ class Game {
         }
     }
 
-    evaluateMove(nextId) {
+    getMoveValue(nextId) {
         return this.getSequenceValue([...this.moves, nextId]);
     }
 }
@@ -241,7 +236,7 @@ function enlargeVertices() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    const game = new Game(nextss, JSON.parse(JSON.stringify(nextss)), new LocalStorageSequenceValueStorage());
+    const game = new Game(nextss, JSON.parse(JSON.stringify(nextss)), new LocalStorageSequenceValueStorage(), new Clock());
     enlargeVertices();
 
     function getNodeId(node) {
@@ -285,10 +280,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tmp && (game.possibleNexts === undefined || game.possibleNexts.includes(getNodeId(tmp)))) {
             play(tmp);
             if (game.possibleNexts.length > 0) {
-                game.evaluateNexts();
-                const botChoice = game.chooseNext();
-                const botElement = document.querySelector(`g#id${botChoice}`);
-                setTimeout(() => {play(botElement);}, 1000);
+                game.evaluateNexts(game.clock.getTime() + 900);
+                setTimeout(() => {
+                    const botChoice = game.chooseNext();
+                    const botElement = document.querySelector(`g#id${botChoice}`);
+                    play(botElement);
+                }, 1000);
             }
         }
     }
