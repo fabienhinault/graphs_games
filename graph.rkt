@@ -199,6 +199,9 @@
 (define (graphs11 nb-vertices nb-edges)
   (parts-w/nb (tailrec-couples '() (range nb-vertices)) nb-edges))
 
+;(remove-duplicates (map rewrite-graph (filter has-no-vertex-degree-1 (filter (λ (_) (equal? #t (contains-all? _ (range 9)))) (graphs11 9 13))))))
+      
+
 (check-equal? (graphs11 3 2) '(((0 2) (0 1)) ((1 2) (0 1)) ((1 2) (0 2))))
 
 (define (contains-deep? l x)
