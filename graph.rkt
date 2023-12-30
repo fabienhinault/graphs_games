@@ -88,7 +88,10 @@
     (cond ((or (< (length l) nb) (< nb 0)) '())
           ((equal? (length l) nb)
            (list l))
-          (else (append
+          (else
+           ; the parts of l of cardinal nb are the ones containing (car l)
+           ; union the ones not containing (car l)
+           (append
                  (map (λ (_) (cons (car l) _))
                       (rec-parts-w/nb (cdr l) (- nb 1)))
                  (rec-parts-w/nb (cdr l) nb)))))
@@ -105,6 +108,53 @@
 (check-equal? (rec-parts-w/nb '(0 1 2 3) 2) '((0 1) (0 2) (0 3) (1 2) (1 3) (2 3)))
 (check-equal? (rec-parts-w/nb '(0 1 2 3) 3) '((0 1 2) (0 1 3) (0 2 3) (1 2 3)))
 (check-equal? (rec-parts-w/nb '(0 1 2 3) 4) '((0 1 2 3)))
+
+
+; partitions of (apply append categories) having nb elements,
+; always taking the first elements in each category
+(define (rec-parts-w/nb-categories categories nb)
+    (cond ((null? categories)
+           '())
+          ((equal? 0 nb)
+           '(()))
+          ((null? (car categories))
+           (rec-parts-w/nb-categories (cdr categories) nb))
+          (else (append
+                 (map (λ (_) (cons (caar categories) _))
+                      (rec-parts-w/nb-categories (cons (cdar categories) (cdr categories)) (- nb 1)))
+                 (rec-parts-w/nb-categories (cdr categories) nb)))))
+
+(check-equal? (rec-parts-w/nb-categories '((0)) 0) '(()))
+(check-equal? (rec-parts-w/nb-categories '(()) 0) '(()))
+(check-equal? (rec-parts-w/nb-categories '() 1) '())
+(check-equal? (rec-parts-w/nb-categories '((0)) 1) '((0)))
+(check-equal? (rec-parts-w/nb-categories '((0)) 2) '())
+(check-equal? (rec-parts-w/nb-categories '((0 1)) 1) '((0)))
+(check-equal? (rec-parts-w/nb-categories '(() (1)) 0) '(()))
+(check-equal? (rec-parts-w/nb-categories '((0) (1)) 1) '((0) (1)))
+(check-equal? (rec-parts-w/nb-categories '((0 1)) 2) '((0 1)))
+(check-equal? (rec-parts-w/nb-categories '((0) (1)) 2) '((0 1)))
+(check-equal? (rec-parts-w/nb-categories '((0 1 2)) 1) '((0)))
+(check-equal? (rec-parts-w/nb-categories '((0) (1 2)) 1) '((0) (1)))
+(check-equal? (rec-parts-w/nb-categories '((0 1) (2)) 1) '((0) (2)))
+(check-equal? (rec-parts-w/nb-categories '((0) (1) (2)) 1) '((0) (1) (2)))
+(check-equal? (rec-parts-w/nb-categories '((0 1 2)) 2) '((0 1)))
+(check-equal? (rec-parts-w/nb-categories '((0) (1) (2)) 2) '((0 1) (0 2) (1 2)))
+(check-equal? (rec-parts-w/nb-categories '((0 1 2)) 3) '((0 1 2)))
+(check-equal? (rec-parts-w/nb-categories '((0 1 2 3)) 1) '((0)))
+(check-equal? (rec-parts-w/nb-categories '((0) (1 2 3)) 1) '((0) (1)))
+(check-equal? (rec-parts-w/nb-categories '((0 1) (2 3)) 1) '((0) (2)))
+(check-equal? (rec-parts-w/nb-categories '((0 1 2) (3)) 1) '((0) (3)))
+(check-equal? (rec-parts-w/nb-categories '((0 1 2 3)) 2) '((0 1)))
+(check-equal? (rec-parts-w/nb-categories '((0) (1 2 3)) 2) '((0 1) (1 2)))
+(check-equal? (rec-parts-w/nb-categories '((0 1) (2 3)) 2) '((0 1) (0 2) (2 3)))
+(check-equal? (rec-parts-w/nb-categories '((0 1 2) (3)) 2) '((0 1) (0 3)))
+(check-equal? (rec-parts-w/nb-categories '((0 1 2 3)) 3) '((0 1 2)))
+(check-equal? (rec-parts-w/nb-categories '((0) (1 2 3)) 3) '((0 1 2) (1 2 3)))
+(check-equal? (rec-parts-w/nb-categories '((0 1) (2 3)) 3) '((0 1 2) (0 2 3)))
+(check-equal? (rec-parts-w/nb-categories '((0 1 2 3)) 4) '((0 1 2 3)))
+(check-equal? (rec-parts-w/nb-categories '((0 1) (2 3)) 4) '((0 1 2 3)))
+
 
 (define (tailrec-parts-update-result tmp-res x)
     (append
@@ -772,6 +822,96 @@ node [shape=circle style=filled fillcolor=gray99]
 ;(for-each
 ;   (lambda (_) (write-dot-file _ 6))
 ;   (filter has-no-vertex-degree-1 _6))
+
+(define (degreess nb-vertices total-degree min-degree max-degree)
+  (if (equal? nb-vertices 1)
+      (if (or (> min-degree total-degree) (< max-degree total-degree))
+          '()
+          `((,total-degree)))
+      (foldl 
+       (λ (degree acc)
+         (append acc
+                 (map (λ (degrees) (cons degree degrees))
+                      (degreess (- nb-vertices 1) (- total-degree degree) degree max-degree))))
+       '()
+       (range min-degree (+ 1 (quotient (- total-degree min-degree) (- nb-vertices 1)))))))
+
+(check-equal? (degreess 1 2 2 2) '((2)))
+(check-equal? (degreess 2 4 2 2) '((2 2)))
+(check-equal? (degreess 3 6 2 2) '((2 2 2)))
+(check-equal? (degreess 4 8 2 3) '((2 2 2 2)))
+(check-equal? (degreess 4 10 2 3) '((2 2 3 3)))
+(check-equal? (degreess 4 12 2 3) '((3 3 3 3)))
+(check-equal? (degreess 5 10 2 4) '((2 2 2 2 2)))
+(check-equal? (degreess 5 12 2 4) '((2 2 2 2 4) (2 2 2 3 3)))
+(check-equal? (degreess 5 14 2 4) '((2 2 2 4 4) (2 2 3 3 4) (2 3 3 3 3)))
+(check-equal? (degreess 5 16 2 4) '((2 2 4 4 4) (2 3 3 4 4) (3 3 3 3 4)))
+(check-equal? (degreess 5 18 2 4) '((2 4 4 4 4) (3 3 4 4 4)))
+(check-equal? (degreess 5 20 2 4) '((4 4 4 4 4)))
+(check-equal? (degreess 6 12 2 5) '((2 2 2 2 2 2)))
+(check-equal? (degreess 6 14 2 5) '((2 2 2 2 2 4) (2 2 2 2 3 3)))
+(check-equal? (degreess 6 16 2 5) '((2 2 2 2 3 5) (2 2 2 2 4 4) (2 2 2 3 3 4) (2 2 3 3 3 3)))
+(check-equal? (degreess 6 18 2 5) '((2 2 2 2 5 5)
+                                    (2 2 2 3 4 5)
+                                    (2 2 2 4 4 4)
+                                    (2 2 3 3 3 5)
+                                    (2 2 3 3 4 4)
+                                    (2 3 3 3 3 4)
+                                    (3 3 3 3 3 3)))
+(check-equal? (degreess 6 20 2 5) '((2 2 2 4 5 5)
+                                    (2 2 3 3 5 5)
+                                    (2 2 3 4 4 5)
+                                    (2 2 4 4 4 4)
+                                    (2 3 3 3 4 5)
+                                    (2 3 3 4 4 4)
+                                    (3 3 3 3 3 5)
+                                    (3 3 3 3 4 4)))
+(check-equal? (degreess 6 22 2 5) '((2 2 3 5 5 5)
+                                    (2 2 4 4 5 5)
+                                    (2 3 3 4 5 5)
+                                    (2 3 4 4 4 5)
+                                    (2 4 4 4 4 4)
+                                    (3 3 3 3 5 5)
+                                    (3 3 3 4 4 5)
+                                    (3 3 4 4 4 4)))
+(check-equal? (degreess 6 24 2 5)   '((2 2 5 5 5 5)
+                                      (2 3 4 5 5 5)
+                                      (2 4 4 4 5 5)
+                                      (3 3 3 5 5 5)
+                                      (3 3 4 4 5 5)
+                                      (3 4 4 4 4 5)
+                                      (4 4 4 4 4 4)))
+(check-equal? (degreess 6 26 2 5) '((2 4 5 5 5 5) (3 3 5 5 5 5) (3 4 4 5 5 5) (4 4 4 4 5 5)))
+(check-equal? (degreess 6 28 2 5) '((3 5 5 5 5 5) (4 4 5 5 5 5)))
+(check-equal? (degreess 6 30 2 5) '((5 5 5 5 5 5)))
+
+
+(define (get-edge-categories vertex vertex-categories)
+  (map (λ (categorie)
+         (map (λ (v) (cons vertex v))
+              categorie))
+       vertex-categories))
+
+; in degrees list of vertices' degrees
+; return: list of graphs matching these degrees
+(define (degrees->graphs degrees first-vertex categories)
+  (cond ((equal? degrees '())
+         '())
+        ((null? (car categories))
+         (degrees->graphs degrees (cdr categories)))
+        (else (let* ((new-categories (map (λ (categorie) (filter-not (λ (v) (equal? v first-vertex))))
+                                          categories))
+                     (edge-categories (get-edge-categories first-vertex new-categories))
+                     (edgess (rec-parts-w/nb-categories edge-categories (car degrees))))
+                (map (λ (edges)
+                       (let* ((new-degrees ("..." (cdr degrees)))
+                              (new-new-categories ("...")))
+                       (append edges (degrees->graphs new-degrees (+ 1 first-vertex) new-new-categories))))
+                 edgess)))))
+                
+      
+  
+  
 
 
 
