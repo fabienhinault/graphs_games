@@ -892,6 +892,18 @@ node [shape=circle style=filled fillcolor=gray99]
               categorie))
        vertex-categories))
 
+(define (get-new-degrees edges degrees first-vertex)
+  (foldl (λ (i degs) (list-update degs i (λ (d) (- d 1))))
+         degrees
+         (map (λ (v) (- v first-vertex)) (map cadr edges))))
+
+(define (get-new-new-categories new-categories edges)
+  (let ((vertices  (map cadr edges)))
+    (append* (map (λ (categorie)
+                    (call-with-values
+                     (partition (λ (v) (member v vertices)))
+                     list))))))
+
 ; in degrees list of vertices' degrees
 ; return: list of graphs matching these degrees
 (define (degrees->graphs degrees first-vertex categories)
@@ -904,8 +916,8 @@ node [shape=circle style=filled fillcolor=gray99]
                      (edge-categories (get-edge-categories first-vertex new-categories))
                      (edgess (rec-parts-w/nb-categories edge-categories (car degrees))))
                 (map (λ (edges)
-                       (let* ((new-degrees ("..." (cdr degrees)))
-                              (new-new-categories ("...")))
+                       (let* ((new-degrees (get-new-degrees edges (cdr degrees) first-vertex))
+                              (new-new-categories (get-new-new-categories new-categories edges)))
                        (append edges (degrees->graphs new-degrees (+ 1 first-vertex) new-new-categories))))
                  edgess)))))
                 
