@@ -1,0 +1,23 @@
+#robot_won.robot_won {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+}
+#robot_won.playing {
+    display: none;
+}
+#robot_won.player_won {
+    display: none;
+}
+
+#player_won.player_won {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+}
+#player_won.playing {
+    display: none;
+}
+#player_won.robot_won {
+    display: none;
+}

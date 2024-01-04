@@ -68,17 +68,18 @@ class Clock {
 }
 
 class Game {
-    constructor(nextss, initialNextss, sequenceValueStorage, clock) {
+    constructor(nextss, initialNextss, sequenceValueStorage, clock, gameOverCallback) {
         this.nextss = nextss;
         this.moves = [];
         this.possibleNexts = undefined;
         this.initialNextss = initialNextss;
         this.sequenceValueStorage= sequenceValueStorage;
         this.clock = clock;
+        this.gameOverCallback = gameOverCallback;
     }
     
     copy() {
-        const result = new Game([...this.nextss.map(_ => [..._])], this.initialNextss, this.sequenceValueStorage, this.clock);
+        const result = new Game([...this.nextss.map(_ => [..._])], this.initialNextss, this.sequenceValueStorage, this.clock, null);
         result.moves = [...this.moves];
         return result;
     }
@@ -91,8 +92,8 @@ class Game {
         return this.moves[this.moves.length - 2];
     }
 
-    getCurrentPlayer(moves) {
-        return moves.length % 2 * firstPlayer;
+    getCurrentPlayer() {
+        return (this.moves.length % 2) * firstPlayer;
     }
 
     evaluateSequence(sequence) {
@@ -190,6 +191,7 @@ class Game {
         if (this.possibleNexts.length === 0) {
             // the game is over
             this.evaluateAllSubsequences();
+            this.gameOverCallback?.();
         }
     }
 
@@ -236,8 +238,22 @@ function enlargeVertices() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    const game = new Game(nextss, JSON.parse(JSON.stringify(nextss)), new LocalStorageSequenceValueStorage(), new Clock());
+    function onGameOver() {
+        const klass = ['robot_won', 'player_won'][game.moves.length % 2];
+        ['#robot_won', '#player_won']
+            .map(idSelector => document.querySelector(idSelector))
+            .forEach(img => img.setAttribute('class', klass));
+    }
+
+    const game = new Game(nextss, JSON.parse(JSON.stringify(nextss)), new LocalStorageSequenceValueStorage(), new Clock(), onGameOver);
     enlargeVertices();
+
+    document.addEventListener('game over',
+        evt => {
+            if (game.getCurrentPlayer() === secondPlayer) {
+                document.querySelector('#robot_won').removeAttribute('style');
+            }
+        }); 
 
     function getNodeId(node) {
         return node.id.substring(2);

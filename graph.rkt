@@ -888,14 +888,20 @@ node [shape=circle style=filled fillcolor=gray99]
 
 (define (get-edge-categories vertex vertex-categories)
   (map (λ (categorie)
-         (map (λ (v) (cons vertex v))
+         (map (λ (v) (list vertex v))
               categorie))
        vertex-categories))
 
+(check-equal? (get-edge-categories 0 '((1) (2))) '(((0 1)) ((0 2))))
+(check-equal? (get-edge-categories 0 '((1 2) (3))) '(((0 1) (0 2)) ((0 3))))
+
+; degrees
 (define (get-new-degrees edges degrees first-vertex)
   (foldl (λ (i degs) (list-update degs i (λ (d) (- d 1))))
          degrees
          (map (λ (v) (- v first-vertex)) (map cadr edges))))
+
+(check-equal? (get-new-degrees '((0 1) (0 2)) 
 
 (define (get-new-new-categories new-categories edges)
   (let ((vertices  (map cadr edges)))
