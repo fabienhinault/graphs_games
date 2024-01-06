@@ -103,15 +103,14 @@ class LocalStorageSequenceValueStorage {
     }
 }
 
-
-
-
 document.addEventListener('DOMContentLoaded', function() {
     function onGameOver() {
-        const klass = ['player2_won', 'player1_won'][game.moves.length % 2];
-        ['#player1_won', '#player2_won']
-            .map(idSelector => document.querySelector(idSelector))
-            .forEach(img => img.setAttribute('class', klass));
+        setTimeout(() => {
+            const klass = ['player2_won', 'player1_won'][game.moves.length % 2];
+            ['#player1_won', '#player2_won']
+                .map(idSelector => document.querySelector(idSelector))
+                .forEach(img => img.setAttribute('class', klass));
+        }, 1000);
     }
 
     const game = new Game(nextss, JSON.parse(JSON.stringify(nextss)), new LocalStorageSequenceValueStorage(), new Clock(), onGameOver);

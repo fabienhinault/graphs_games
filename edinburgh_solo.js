@@ -248,13 +248,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const game = new Game(nextss, JSON.parse(JSON.stringify(nextss)), new LocalStorageSequenceValueStorage(), new Clock(), onGameOver);
     enlargeVertices();
 
-    document.addEventListener('game over',
-        evt => {
-            if (game.getCurrentPlayer() === secondPlayer) {
-                document.querySelector('#robot_won').removeAttribute('style');
-            }
-        }); 
-
     function getNodeId(node) {
         return node.id.substring(2);
     }
