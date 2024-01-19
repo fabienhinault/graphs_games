@@ -155,8 +155,8 @@
 (check-equal? (rec-parts-w/nb-categories '((0 1) (2 3)) 3) '((0 1 2) (0 2 3)))
 (check-equal? (rec-parts-w/nb-categories '((0 1 2 3)) 4) '((0 1 2 3)))
 (check-equal? (rec-parts-w/nb-categories '((0 1) (2 3)) 4) '((0 1 2 3)))
-(check-equal? (rec-parts-w/nb-categories  '(((0 1)) ((0 2) (0 3))) 2) '(((0 1) (0 2)) ((0 2) (0 3))))
-
+(check-equal? (rec-parts-w/nb-categories '(((0 1)) ((0 2) (0 3))) 2) '(((0 1) (0 2)) ((0 2) (0 3))))
+(check-equal? (rec-parts-w/nb-categories '(((1 2)) ((1 3))) 1) '(((1 2)) ((1 3))))
 
 (define (tailrec-parts-update-result tmp-res x)
     (append
@@ -897,7 +897,11 @@ node [shape=circle style=filled fillcolor=gray99]
 (check-equal? (get-edge-categories 0 '((1) (2))) '(((0 1)) ((0 2))))
 (check-equal? (get-edge-categories 0 '((1 2) (3))) '(((0 1) (0 2)) ((0 3))))
 (check-equal? (get-edge-categories 0 '((1) (2 3))) '(((0 1)) ((0 2) (0 3))))
-; degrees
+(check-equal? (get-edge-categories 1 '((2) (3))) '(((1 2)) ((1 3))))
+
+; removes 1 to the degrees of vertices strictly after first-vertex appearing in edges
+; edges starting with first-vertex which will decrement degrees
+; degrees of vertices strictly after first-vertex
 (define (get-new-degrees edges degrees first-vertex)
   (foldl (λ (i degs) (list-update degs i (λ (d) (- d 1))))
          degrees
@@ -921,6 +925,14 @@ node [shape=circle style=filled fillcolor=gray99]
 (check-equal? (get-new-new-categories '((1 2 3)) '((0 1) (0 2))) '((1 2) (3)))
 (check-equal? (get-new-new-categories '((1) (2 3)) '((0 1) (0 2))) '((1) (2) (3)))
 
+(define (filter-out-vertex-from-categories vertex categories)
+  (filter-not
+   null?
+   (map (λ (categorie) (filter-not (λ (v) (equal? v vertex)) categorie))
+        categories)))
+
+(check-equal? (filter-out-vertex-from-categories 0 '((0 1) (2 3))) '((1) (2 3)))
+(check-equal? (filter-out-vertex-from-categories 1 '((1) (2) (3))) '((2) (3)))
 
 ; in degrees list of vertices' degrees
 ; return: list of graphs matching these degrees
@@ -929,25 +941,28 @@ node [shape=circle style=filled fillcolor=gray99]
          '())
         ((null? (car categories))
          (degrees->graphs degrees first-vertex (cdr categories)))
-        (else (let* ((new-categories
-                      (map (λ (categorie) (filter-not (λ (v) (equal? v first-vertex)) categorie))
-                           categories))
+        (else (let* ((new-categories (filter-out-vertex-from-categories first-vertex categories))
                      (edge-categories (get-edge-categories first-vertex new-categories))
                      (edgess (rec-parts-w/nb-categories edge-categories (car degrees))))
                 (map (λ (edges)
                        (let* ((new-degrees (get-new-degrees edges (cdr degrees) first-vertex))
-                              (new-new-categories (get-new-new-categories new-categories edges)))
-                       (append edges (degrees->graphs new-degrees (+ 1 first-vertex) new-new-categories))))
+                              (new-new-categories (get-new-new-categories new-categories edges))
+                              (sub-graphs (degrees->graphs new-degrees (+ 1 first-vertex) new-new-categories)))
+                         (if (null? sub-graphs)
+                             '()
+                             (map (λ (sub-graph)
+                                    (append edges sub-graph))
+                                  sub-graphs))))
                      edgess)))))
-                
-(check-equal?   (map (λ (categorie) (filter-not (λ (v) (equal? v 0)) categorie))
-                     '((0 1) (2 3)))
-                '((1) (2 3)))
-(check-equal?   (map (λ (categorie) (filter-not (λ (v) (equal? v 1)) categorie))
-                     '((1) (2) (3)))
-                '((2) (3)))
-(check-equal? (degrees->graphs '(1 2 3) 1 '((1) (2) (3))) '(((1 2) (2 3) (1 3))))
-(check-equal? (degrees->graphs '(2 2 3 3) 0 '((0 1) (2 3))) '())
+
+
+(check-equal? (get-new-new-categories '((2) (3)) '((1 2))) '((2) (3)))
+(check-equal? (get-new-degrees '((0 1) (0 2)) '(2 3 3) 0) '(1 2 3))
+(check-equal? (rec-parts-w/nb-categories '(((1 2)) ((1 3))) 1) '(((1 2)) ((1 3))))
+(check-equal? (get-edge-categories 1 '((2) (3))) '(((1 2)) ((1 3))))
+(check-equal? (filter-out-vertex-from-categories 1 '((1) (2) (3))) '((2) (3)))
+(check-equal? (degrees->graphs '(1 2 3) 1 '((1) (2) (3))) '())
+(check-equal? (degrees->graphs '(2 2 3 3) 0 '((0 1) (2 3))) '(((0 2) (0 3) (1 2) (1 3) (2 3))))
 
 
 
