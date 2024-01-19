@@ -941,25 +941,58 @@ node [shape=circle style=filled fillcolor=gray99]
          '())
         ((null? (car categories))
          (degrees->graphs degrees first-vertex (cdr categories)))
+        ((equal? degrees '(0))
+         '(()))
         (else (let* ((new-categories (filter-out-vertex-from-categories first-vertex categories))
                      (edge-categories (get-edge-categories first-vertex new-categories))
                      (edgess (rec-parts-w/nb-categories edge-categories (car degrees))))
-                (filter-not
-                 null?
-                 (map (λ (edges)
-                        (let* ((new-degrees (get-new-degrees edges (cdr degrees) first-vertex))
-                               (new-new-categories (get-new-new-categories new-categories edges))
-                               (sub-graphs (degrees->graphs new-degrees
-                                                            (+ 1 first-vertex)
-                                                            new-new-categories)))
-                          (if (null? sub-graphs)
-                              '()
-                              (map (λ (sub-graph)
-                                     (append edges sub-graph))
-                                   sub-graphs))))
-                      edgess))))))
+                 (append-map
+                  (λ (edges)
+                    (let* ((new-degrees (get-new-degrees edges (cdr degrees) first-vertex))
+                           (new-new-categories (get-new-new-categories new-categories edges))
+                           (sub-graphs (degrees->graphs new-degrees
+                                                        (+ 1 first-vertex)
+                                                        new-new-categories)))
+                      (if (null? sub-graphs)
+                          '()
+                          (map (λ (sub-graph)
+                                 (append edges sub-graph))
+                               sub-graphs))))
+                  edgess)))))
 
 
+
+(check-equal? (degrees->graphs '(0) 1 '((1))) '(()))
+
+(check-equal? (get-new-new-categories '((1)) '((0 1))) '((1)))
+(check-equal? (get-new-degrees '((0 1)) '(1) 0) '(0))
+(check-equal? (rec-parts-w/nb-categories '(((0 1))) 1) '(((0 1))))
+(check-equal? (get-edge-categories 0 '((1))) '(((0 1))))
+(check-equal? (filter-out-vertex-from-categories 0 '((0 1))) '((1)))
+(check-equal? (degrees->graphs '(1 1) 0 '((0 1))) '(((0 1))))
+
+(check-equal? (degrees->graphs '(0) 3 '((3))) '(()))
+
+(check-equal? (get-new-new-categories '((3)) '((2 3))) '((3)))
+(check-equal? (get-new-degrees '((2 3)) '(1) 2) '(0))
+(check-equal? (rec-parts-w/nb-categories '(((2 3))) 1) '(((2 3))))
+(check-equal? (get-edge-categories 2 '((3))) '(((2 3))))
+(check-equal? (filter-out-vertex-from-categories 2 '((2 3))) '((3)))
+(check-equal? (degrees->graphs '(1 1) 2 '((2 3))) '(((2 3))))
+
+(check-equal? (get-new-new-categories '((2 3)) '((1 2) (1 3))) '((2 3)))
+(check-equal? (get-new-degrees '((1 2) (1 3)) '(2 2) 1) '(1 1))
+(check-equal? (rec-parts-w/nb-categories '(((1 2) (1 3))) 2) '(((1 2) (1 3))))
+(check-equal? (get-edge-categories 1 '((2 3))) '(((1 2) (1 3))))
+(check-equal? (filter-out-vertex-from-categories 1 '((1) (2 3))) '((2 3)))
+(check-equal? (degrees->graphs '(2 2 2) 1 '((1) (2 3))) '(((1 2) (1 3) (2 3))))
+
+(check-equal? (get-new-new-categories '((1) (2 3)) '((0 2) (0 3))) '((1) (2 3)))
+(check-equal? (get-new-degrees '((0 2) (0 3)) '(2 3 3) 0) '(2 2 2))
+
+(check-equal? (rec-parts-w/nb-categories '() '(2)) '())
+(check-equal? (get-edge-categories 3 '()) '())
+(check-equal? (filter-out-vertex-from-categories 3 '((3))) '())
 (check-equal? (degrees->graphs '(2) 3 '((3))) '())
 
 (check-equal? (get-new-new-categories '((3)) '((2 3))) '((3)))
@@ -976,8 +1009,11 @@ node [shape=circle style=filled fillcolor=gray99]
 (check-equal? (filter-out-vertex-from-categories 1 '((1) (2) (3))) '((2) (3)))
 (check-equal? (degrees->graphs '(1 2 3) 1 '((1) (2) (3))) '())
 
+(check-equal? (get-new-new-categories '((1) (2 3)) '((0 1) (0 2))) '((1) (2) (3)))
 (check-equal? (get-new-degrees '((0 1) (0 2)) '(2 3 3) 0) '(1 2 3))
-
+(check-equal? (rec-parts-w/nb-categories '(((0 1)) ((0 2) (0 3))) 2) '(((0 1) (0 2)) ((0 2) (0 3))))
+(check-equal? (get-edge-categories 0 '((1) (2 3))) '(((0 1)) ((0 2) (0 3))))
+(check-equal? (filter-out-vertex-from-categories 0 '((0 1) (2 3))) '((1) (2 3)))
 (check-equal? (degrees->graphs '(2 2 3 3) 0 '((0 1) (2 3))) '(((0 2) (0 3) (1 2) (1 3) (2 3))))
 
 
