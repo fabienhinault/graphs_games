@@ -504,8 +504,8 @@
          (flatten (vector->list vector-graph-nodes-by-degree)))
     node-renamings))
 
-(check-equal? (hash->list (get-degree-renaming '((0 1) (0 2)) 3 (new-name-numeric-generator)))
-              '((0 . 2) (2 . 1) (1 . 0)))
+(check-not-false (member (hash->list (get-degree-renaming '((0 1) (0 2)) 3 (new-name-numeric-generator)))
+              '(((0 . 2) (2 . 1) (1 . 0)) ((0 . 2) (1 . 0) (2 . 1)))))
 
 (define (get-graph-degrees graph)
   (deep (λ (_) (get-degree _ graph)) graph))
@@ -1027,7 +1027,24 @@ node [shape=circle style=filled fillcolor=gray99]
 (check-equal? (degrees->graphs '(2 2 3 3) 0 '((0 1) (2 3))) '(((0 2) (0 3) (1 2) (1 3) (2 3))))
 
 
-(check-equal? (get-new-degrees '([1 3]) '(2 2 3) 1)
+(check-equal? (degrees->graphs '(1) 4 '((4))) '())
+(check-equal? (get-new-new-categories '((4)) '([3 4])) '((4)))
+(check-equal? (remove-categories-before-last-joined '((4)) '([3 4])) '((4)))
+(check-equal? (get-new-degrees '([3 4]) '(2) 3) '(1))
+(check-equal? (rec-parts-w/nb-categories '(([3 4])) 0) '(()))
+(check-equal? (get-edge-categories 3 '((4))) '(([3 4])))
+(check-equal? (filter-out-vertex-from-categories 3 '((4))) '((4)))
+;(check-equal? (degrees->graphs '(0 2) 3 '((4))) '())
+(check-equal? (get-new-new-categories '((4)) '([2 3] [2 4])) '((4)))
+(check-equal? (remove-categories-before-last-joined '((3) (4)) '([2 3] [2 4])) '((4)))
+(check-equal? (get-new-degrees '([2 3] [2 4]) '(1 3) 2) '(0 2))
+(check-equal? (rec-parts-w/nb-categories  '(([2 3]) ([2 4])) 2) '(([2 3] [2 4])))
+(check-equal? (get-edge-categories 2 '((3) (4))) '(([2 3]) ([2 4])))
+(check-equal? (filter-out-vertex-from-categories 2 '((2) (3) (4))) '((3) (4)))
+;(check-equal? (degrees->graphs '(2 1 3) 2  '((2) (3) (4))) '())
+(check-equal? (get-new-new-categories '((3) (4)) '([1 3])) '((3) (4)))
+(check-equal? (remove-categories-before-last-joined '((2) (3) (4)) '([1 3])) '((3) (4)))
+(check-equal? (get-new-degrees '([1 3]) '(2 2 3) 1) '(2 1 3))
               
 (check-equal? (degrees->graphs '(1 2 3) 2  '((2) (3) (4))) '())
 (check-equal? (get-new-new-categories '((2) (3) (4)) '([1 2])) '((2) (3) (4)))
