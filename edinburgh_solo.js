@@ -252,7 +252,6 @@ function moveEdgesLast() {
     });
 }
 
-        
 function voronoize() {
     const box = document.querySelector('#graph0 > polygon');
     const points = box.points;
@@ -267,20 +266,6 @@ function voronoize() {
         const cell = diagram.cells[voronoiId];
         createPolygon(svg, vertices[iVertex], cell);
     }
-    
-}
-
-function enlargeVertices() {
-    document.querySelectorAll('g.node').forEach(g => {
-        // all vertices seem to be at least 18 away from each other.
-        const extraRadius = 9;
-        const ellipse = g.querySelector('ellipse');
-        const clonedEllipse = ellipse.cloneNode(false);
-        clonedEllipse.removeAttribute('stroke');
-        clonedEllipse.setAttribute('rx', Number(clonedEllipse.getAttribute('rx')) + extraRadius);
-        clonedEllipse.setAttribute('ry', Number(clonedEllipse.getAttribute('ry')) + extraRadius);
-        ellipse.insertAdjacentElement('beforebegin', clonedEllipse);
-    });
 }
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -342,11 +327,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.body.onclick = (event) => {
         const tmp = event.target.closest('svg > g > g.node');
-        console.log(event);
-        if (tmp === null) {
-            // const tmps = argsMin(nextss, 
-            getNodeCoordinates(0);
-        }
         if (tmp && (game.possibleNexts === undefined || game.possibleNexts.includes(getNodeId(tmp)))) {
             play(tmp);
             if (game.possibleNexts.length > 0) {
