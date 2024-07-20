@@ -5,3 +5,7 @@
 *.png
 *.swp
 *~
+
+
+.history/
+9/

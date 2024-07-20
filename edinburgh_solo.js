@@ -268,7 +268,7 @@ function voronoize() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     function onGameOver() {
         const klass = ['robot_won', 'player_won'][game.moves.length % 2];
         ['#robot_won', '#player_won']
@@ -276,6 +276,11 @@ document.addEventListener('DOMContentLoaded', function() {
             .forEach(img => img.setAttribute('class', klass));
     }
 
+    const path = new URL(window.location.toLocaleString()).searchParams.get('path');
+    const {nextss} = await import(`${path}.js`);
+    const svg = document.querySelector('#svg');
+    svg.innerHTML = await (await fetch(`${path}.svg`)).text();
+    svg.replaceWith(...svg.childNodes);
     const game = new Game(nextss, JSON.parse(JSON.stringify(nextss)), new LocalStorageSequenceValueStorage(), new Clock(), onGameOver);
     moveEdgesLast();
     voronoize();
@@ -296,7 +301,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function play(tmp) {
         previous = current;
         current = tmp;
-        game.play(getNodeId(current));
+        const idString = getNodeId(current); 
+        const idNumber = Number(idString);
+        game.play(idNumber);
         updateSvgCurrentVertex();
         if (previous !== undefined) {
             updateSvgLastVertex(previous);
