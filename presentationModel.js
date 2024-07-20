@@ -11,7 +11,7 @@ function onGameOver(winner) {
 }
 
 function getNodeId(node) {
-    return node.id.substring(2);
+    return Number(node.id.substring(2));
 }
 
 function updateSvgCurrentVertex() {

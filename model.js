@@ -1,15 +1,6 @@
+"use strict";
 
-const firstPlayer = 1000;
-const secondPlayer = 0;
-const probableFirstPlayer = 750;
-const probableSecondPlayer = 250;
-const unsure = (probableFirstPlayer + probableSecondPlayer) / 2;
-const sequenceValuesMap = new Map([
-    [probableSecondPlayer, probableSecondPlayer],
-    [(probableSecondPlayer + unsure) / 2 , probableSecondPlayer],
-    [unsure, unsure],
-    [(unsure + probableFirstPlayer) / 2, probableFirstPlayer], 
-    [probableFirstPlayer, probableFirstPlayer]]);
+
 
 function range(size, startAt = 0) {
     return [...Array(size).keys()].map(i => i + startAt);
@@ -64,6 +55,61 @@ class Clock {
     }
 }
 
+const firstPlayerValue = 1000;
+const secondPlayerValue = 0;
+const unsure = (firstPlayerValue + secondPlayerValue) / 2;
+
+class Player {
+    constructor(value) {
+        this.value = value;
+    }
+    
+    getOtherPlayer() {
+        return otherPlayers[this.value];
+    }
+    
+    static getLastPlayer(moves) {
+        return players[(moves.length % 2) * firstPlayerValue];
+    }
+    
+    getProbable() {
+        return (unsure + this.value) / 2;
+    }
+
+    minmax(nextsValues) {
+        return minmaxes[this.value](...nextsValues);
+    }
+}
+
+const firstPlayer = new Player(firstPlayerValue);
+const secondPlayer = new Player(secondPlayerValue);
+let players = [];
+[firstPlayer, secondPlayer].forEach(p => {players[p.value] = p;});
+let otherPlayers = [firstPlayer];
+otherPlayers[firstPlayer.value] = secondPlayer;
+let minmaxes = [Math.min];
+minmaxes[firstPlayer.value] = Math.max;
+const probableFirstPlayer = firstPlayer.getProbable();
+const probableSecondPlayer = secondPlayer.getProbable();
+const sequenceValuesMap = new Map([
+    [probableSecondPlayer, probableSecondPlayer],
+    [(probableSecondPlayer + unsure) / 2 , probableSecondPlayer],
+    [unsure, unsure],
+    [(unsure + probableFirstPlayer) / 2, probableFirstPlayer], 
+    [probableFirstPlayer, probableFirstPlayer]
+]);
+
+function otherPlayerValue(playerValue) {
+    return firstPlayerValue - playerValue;
+}
+
+function checkNotNan(n) {
+    if (Number.isNaN(n)) {
+        throw new Error();
+    }
+    return n;
+}
+
 class Game {
     constructor(nextss, initialNextss, sequenceValueStorage, clock, gameOverCallback) {
         this.nextss = nextss;
@@ -73,6 +119,7 @@ class Game {
         this.sequenceValueStorage= sequenceValueStorage;
         this.clock = clock;
         this.gameOverCallback = gameOverCallback;
+        this.currentPlayer = firstPlayer;
     }
     
     copy() {
@@ -96,40 +143,36 @@ class Game {
     evaluateSequence(sequence) {
         const lastMove = sequence[sequence.length - 1];
         // player who just played last move
-        const lastPlayer = getLastPlayer(sequence);
-        const nextPlayer = otherPlayer(lastPlayer);
+        const lastPlayer = Player.getLastPlayer(sequence);
+        const nextPlayer = lastPlayer.getOtherPlayer();
         const nexts = this.initialNextss[lastMove].filter(_ => !sequence.includes(_));
         const nextsValues = nexts.map(next => this.getSequenceValue([...sequence, next]));
-        const nextsValuesNotNextPlayer = nextsValues.filter(_ => Math.abs(_ - nextPlayer) > probableSecondPlayer);
+        const nextsValuesNotNextPlayer = nextsValues.filter(_ => Math.abs(_ - nextPlayer.value) > probableSecondPlayer);
         if (nextsValuesNotNextPlayer.length < nextsValues.length) {
-            return this.minmax(nextPlayer, nextsValues) - 0.02 * (nextPlayer - unsure) * (nextsValuesNotNextPlayer.length + 1);
+             return checkNotNan(nextPlayer.minmax(nextsValues) - 0.02 * (nextPlayer.value - unsure) * (nextsValuesNotNextPlayer.length + 1));
         }
-        if (nextsValues.includes(lastPlayer)) {
-            const nextsValuesNotLastPlayer = nextsValues.filter(_ => _ != lastPlayer);
+        if (nextsValues.includes(lastPlayer.value)) {
+            const nextsValuesNotLastPlayer = nextsValues.filter(_ => _ != lastPlayer.value);
             if (nextsValuesNotLastPlayer.length === 0) {
-                return lastPlayer;
+                return checkNotNan(lastPlayer.value);
             } else {
                 // some moves are winning for lastPlayer, but nextPlayer is unlikely to play them.
                 // just add a few points for lastPlayer.
-                return this.minmax(nextPlayer, nextsValuesNotLastPlayer) + 0.02 * (lastPlayer - unsure) * (nextsValues.length - nextsValuesNotLastPlayer.length);
+                return checkNotNan(nextPlayer.minmax(nextsValuesNotLastPlayer) + 0.02 * (lastPlayer.value - unsure) * (nextsValues.length - nextsValuesNotLastPlayer.length));
             }
         }
-        return this.minmax(nextPlayer, nextsValues);
-    }
-
-    minmax(nextPlayer, nextsValues) {
-        if (nextPlayer === firstPlayer) {
-            return Math.max(...nextsValues);
-        } else {
-            return Math.min(...nextsValues);
-        }
+        return checkNotNan(nextPlayer.minmax(nextsValues));
     }
 
     evaluateAllSubsequences() {
-        this.sequenceValueStorage.storeValue(this.moves, getLastPlayer(this.moves));
-        this.sequenceValueStorage.storeValue(this.moves.slice(0, this.moves.length -1), getLastPlayer(this.moves));
+        const lastPlayerValue = Player.getLastPlayer(this.moves).value;
+        this.sequenceValueStorage.storeValue(this.moves, lastPlayerValue);
+        this.sequenceValueStorage.storeValue(this.moves.slice(0, this.moves.length -1), lastPlayerValue);
         range(this.moves.length - 2, 1).reverse().map(_ => this.moves.slice(0, _)).forEach((subsequence) => {
             const value = this.evaluateSequence(subsequence);
+            if (Number.isNaN(value)) {
+                throw new Error();
+            }
             if (value !== unsure) {
               this.sequenceValueStorage.storeValue(subsequence, value);
             } else {
@@ -169,7 +212,7 @@ class Game {
         console.debug('notLosings', notLosings);
         if (notLosings.length >= 1) {
             const weighteds = notLosings.map(_ => {
-                return {move: _.move, weight: otherPlayer(_.value)};
+                return {move: _.move, weight: otherPlayerValue(_.value)};
             });
             console.debug('weighteds', weighteds);
             return (pickWeighted(weighteds)).move;
@@ -180,6 +223,7 @@ class Game {
 
     play(current) {
         this.moves.push(current);
+        this.currentPlayer = this.currentPlayer.getOtherPlayer();
         this.possibleNexts = [...this.nextss[current]];
         this.nextss = this.nextss.map((nexts, iNexts) => {
             return nexts.filter(next => next != current);
@@ -199,6 +243,9 @@ class Game {
 
 class LocalStorageSequenceValueStorage {
     storeValue(sequence, value) {
+        if (Number.isNaN(value)) {
+            throw new Error();
+        }
         localStorage.setItem(sequence, value);
     }
     getValue(sequence) {
@@ -208,17 +255,3 @@ class LocalStorageSequenceValueStorage {
         localStorage.removeItem(sequence);
     }
 }
-
-function getLastPlayer(moves) {
-    return moves.length % 2 * firstPlayer;
-}
-
-function otherPlayer(player) {
-    return firstPlayer - player;
-}
-
-function probablePlayer(player) {
-    return (unsure + player) / 2;
-}
-
-
