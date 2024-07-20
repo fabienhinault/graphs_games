@@ -9,18 +9,18 @@
   <body>
     <div id="mocha"></div>
 
-    <script src="https://unpkg.com/chai/chai.js"></script>
-    <script src="https://unpkg.com/mocha/mocha.js"></script>
+    <script type="module" src="https://unpkg.com/chai/chai.js"></script>
+    <!-- script src="https://unpkg.com/mocha/mocha.js"></script -->
     <!-- <script src="chai.js"></script -->
-    <!-- <script src="mocha.js"></script -->
+    <script src="mocha.js"></script>
 
     <script class="mocha-init">
       mocha.setup('bdd');
       mocha.checkLeaks();
 	    nextss = [];
     </script>
-    <script src="edinburgh_solo.js"></script>
-    <script src="test.edinburgh_solo.js"></script>
+    <script src="model.js"></script>
+    <script type="module" src="test.edinburgh_solo.js"></script>
     <script class="mocha-exec">
       mocha.run();
     </script>

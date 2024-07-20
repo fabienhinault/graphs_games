@@ -199,6 +199,17 @@ class Game {
         }
     }
 
+    evaluateNextsSync(time) {
+        if (!time || this.clock.getTime() < time) {
+            for (let next of this.possibleNexts) {
+                const game = this.copy();
+                game.play(next);
+                game.evaluateNextsSync(time);
+            }
+        }
+    }
+
+
     // choose best next move for bot who plays second
     chooseNext() {
         const possibleNextsValues = this.possibleNexts.map(move => {return {move, value:this.getMoveValue(move)};});
