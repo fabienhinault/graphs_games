@@ -25,11 +25,35 @@ class MemorySequenceValueStorage {
     }
 }
 
+function createGame(nextss) {
+    const game = new Game(nextss, JSON.parse(JSON.stringify(nextss)), new Clock(), null);
+    const evaluator = new Evaluator(game, null, new MemorySequenceValueStorage());
+    game.gameOverCallback = evaluator.onGameOver.bind(evaluator);
+    return {game, evaluator};
+}
+
+function createGameMock(nextss) {
+    const game = new Game(nextss, JSON.parse(JSON.stringify(nextss)), new Clock(), null);
+    const evaluator = new Evaluator(game, null, new MockSequenceValueStorage());
+    game.gameOverCallback = evaluator.onGameOver.bind(evaluator);
+    return {game, evaluator};
+}
 
 describe('edinburgh_solo', function () {
     it('dummy', function () {
         assert.equal(1, 1);
     });
+
+
+    it('www', function () {
+        const {game, evaluator} = createGame([[1, 2, 3], [0], [0], [0]]);
+        const map = evaluator.sequenceValueStorage.values;
+        map.set("0,1", firstPlayerValue);
+        map.set("0,2", firstPlayerValue);
+        map.set("0,3", firstPlayerValue);
+        assert.equal(evaluator.evaluateSequence([0]), firstPlayerValue);
+    });
+
 
 //   0--1--2--3--4--5
 //               | /
