@@ -271,20 +271,16 @@ class Evaluator {
 
     // choose best next move for bot who plays second
     chooseNext() {
-        const possibleNextsValues = this.game.possibleNexts.map(move => {return {move, value:this.getMoveValue(move)};});
-        console.debug('possibleNextsValues', possibleNextsValues);
+        const possibleNextsValues = this.possibleNexts.map(move => {return {move, value:this.getMoveValue(move)};});
         const winning = possibleNextsValues.find(_ => _.value < probableSecondPlayer);
         if (winning) {
-            console.debug('winning', winning);
             return winning.move;
         }
         const notLosings = possibleNextsValues.filter(_ => _.value <= probableFirstPlayer);
-        console.debug('notLosings', notLosings);
         if (notLosings.length >= 1) {
             const weighteds = notLosings.map(_ => {
                 return {move: _.move, weight: otherPlayerValue(_.value)};
             });
-            console.debug('weighteds', weighteds);
             return (pickWeighted(weighteds)).move;
         } else {
             return pick(argsMin(possibleNextsValues, _ => _.value)).move;

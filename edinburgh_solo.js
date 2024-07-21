@@ -79,6 +79,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     const botChoice = evaluator.chooseNext();
                     const botElement = document.querySelector(`g#id${botChoice}`);
                     play(botElement);
+                    console.debug(localStorage.length);
                 }, 1000);
             }
         }
