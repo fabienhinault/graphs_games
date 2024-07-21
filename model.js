@@ -249,11 +249,17 @@ class Evaluator {
     }
 
     evaluateNexts(time) {
-        this.evaluateAbstract(time, (gameCopy, time) => {setTimeout(() => new Evaluator(gameCopy, null, this.sequenceValueStorage).evaluateNexts(time), 0);});
+        this.evaluateAbstract(time, (evaluator, t) => {
+            setTimeout(() => {
+                evaluator.evaluateNexts(t);
+            }, 0);
+        });
     }
 
     evaluateNextsSync(time) {
-        this.evaluateAbstract(time, (gameCopy, time) => {new Evaluator(gameCopy, null, this.sequenceValueStorage).evaluateNextsSync(time);});
+        this.evaluateAbstract(time, (evaluator, t) => {
+            evaluator.evaluateNextsSync(t);
+        });
     }
 
     evaluateAbstract(time, f) {
@@ -262,8 +268,10 @@ class Evaluator {
             if (!firstPlayer.isWinning(value) && !secondPlayer.isWinning(value)) {
                 for (let next of this.game.possibleNexts) {
                     const gameCopy = this.game.copy();
+                    const evaluator = new Evaluator(gameCopy, null, this.sequenceValueStorage);
+                    gameCopy.gameOverCallback = evaluator.onGameOver.bind(evaluator); 
                     gameCopy.play(next);
-                    f(gameCopy, time);
+                    f(evaluator, time);
                 }
             }
         }
@@ -271,7 +279,7 @@ class Evaluator {
 
     // choose best next move for bot who plays second
     chooseNext() {
-        const possibleNextsValues = this.possibleNexts.map(move => {return {move, value:this.getMoveValue(move)};});
+        const possibleNextsValues = this.game.possibleNexts.map(move => {return {move, value:this.getMoveValue(move)};});
         const winning = possibleNextsValues.find(_ => _.value < probableSecondPlayer);
         if (winning) {
             return winning.move;
