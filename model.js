@@ -58,10 +58,12 @@ class Clock {
 const firstPlayerValue = 1000;
 const secondPlayerValue = 0;
 const unsure = (firstPlayerValue + secondPlayerValue) / 2;
+const valueThreshold = Math.abs((firstPlayerValue - secondPlayerValue) / 4);
 
 class Player {
-    constructor(value) {
+    constructor(value, bestValueFunction, attenuationFactor) {
         this.value = value;
+        this.bestValueFunction = bestValueFunction;
     }
     
     getOtherPlayer() {
@@ -76,13 +78,32 @@ class Player {
         return (unsure + this.value) / 2;
     }
 
+    getBestValue(nextsValues) {
+        return this.bestValueFunction(...nextsValues);
+    }
+
     minmax(nextsValues) {
         return minmaxes[this.value](...nextsValues);
     }
+
+    // attenuate the value to be given to a sequence.
+    // Typically the sequence will be given the value of the player attenuated to take
+    // some circumstances in account.
+    // For example a sequence with one winning next move and many losing next moves is not as winning as
+    // a sequence with only winning next moves and no losing next move.
+    attenuate(value, weight) {
+        return value - attenuationFactor * weight; 
+    }
+
+    // wether the value of a sequence is winning for player
+    isWinning(sequenceValue) {
+        return Math.abs(sequenceValue - this.value) < valueThreshold;
+    }
 }
 
-const firstPlayer = new Player(firstPlayerValue);
-const secondPlayer = new Player(secondPlayerValue);
+const attenuationFactor = 0.02 * (firstPlayerValue - unsure);
+const firstPlayer = new Player(firstPlayerValue, Math.max, attenuationFactor);
+const secondPlayer = new Player(secondPlayerValue, Math.min, -attenuationFactor);
 let players = [];
 [firstPlayer, secondPlayer].forEach(p => {players[p.value] = p;});
 let otherPlayers = [firstPlayer];
@@ -111,19 +132,18 @@ function checkNotNan(n) {
 }
 
 class Game {
-    constructor(nextss, initialNextss, sequenceValueStorage, clock, gameOverCallback) {
+    constructor(nextss, initialNextss, clock, gameOverCallback) {
         this.nextss = nextss;
         this.moves = [];
         this.possibleNexts = undefined;
         this.initialNextss = initialNextss;
-        this.sequenceValueStorage= sequenceValueStorage;
         this.clock = clock;
         this.gameOverCallback = gameOverCallback;
         this.currentPlayer = firstPlayer;
     }
     
     copy() {
-        const result = new Game([...this.nextss.map(_ => [..._])], this.initialNextss, this.sequenceValueStorage, this.clock, null);
+        const result = new Game([...this.nextss.map(_ => [..._])], this.initialNextss, this.clock, null);
         result.moves = [...this.moves];
         return result;
     }
@@ -140,35 +160,74 @@ class Game {
         return (this.moves.length % 2) * firstPlayer;
     }
 
+    play(current) {
+        this.moves.push(current);
+        this.currentPlayer = this.currentPlayer.getOtherPlayer();
+        this.possibleNexts = [...this.nextss[current]];
+        this.nextss = this.nextss.map((nexts, iNexts) => {
+            return nexts.filter(next => next != current);
+        });
+        this.nextss[current] = [];
+        if (this.possibleNexts.length === 0) {
+            // the game is over
+            this.gameOverCallback?.(this.moves.length % 2);
+        }
+    }
+
+    getLastMove() {
+        return this.moves[this.moves.length - 1];
+    }
+
+    getNextMoves() {
+        return this.nextss[this.getLastMove()];
+    }
+}
+
+
+class Evaluator {
+    constructor(game, gameOverCallback, sequenceValueStorage) {
+        this.game = game;
+        this.gameOverCallback = gameOverCallback;
+        this.sequenceValueStorage= sequenceValueStorage;
+    }
+
+    /* The value of a sequence says if the sequence is winning for firstPlayer or secondPlayer.
+     * It is winning for firstPlayer if the value is close to firstPlayerValue, and same for secondPlayer.
+     * The value of the sequence depends on the value of its successors.
+     */
     evaluateSequence(sequence) {
         const lastMove = sequence[sequence.length - 1];
         // player who just played last move
         const lastPlayer = Player.getLastPlayer(sequence);
         const nextPlayer = lastPlayer.getOtherPlayer();
-        const nexts = this.initialNextss[lastMove].filter(_ => !sequence.includes(_));
+        const nexts = this.game.initialNextss[lastMove].filter(_ => !sequence.includes(_));
         const nextsValues = nexts.map(next => this.getSequenceValue([...sequence, next]));
-        const nextsValuesNotNextPlayer = nextsValues.filter(_ => Math.abs(_ - nextPlayer.value) > probableSecondPlayer);
-        if (nextsValuesNotNextPlayer.length < nextsValues.length) {
-             return checkNotNan(nextPlayer.minmax(nextsValues) - 0.02 * (nextPlayer.value - unsure) * (nextsValuesNotNextPlayer.length + 1));
+        const nextsValuesUnsureOrWinningForLastPlayer = nextsValues.filter(v => !nextPlayer.isWinning(v));
+        const thereIsSomeNextValueWinningForNextPlayer = nextsValues.some(v => nextPlayer.isWinning(v));
+        if (thereIsSomeNextValueWinningForNextPlayer) {
+             return checkNotNan(nextPlayer.attenuate(nextPlayer.getBestValue(nextsValues), nextsValuesUnsureOrWinningForLastPlayer.length + 1));
         }
+        // only unsure or winning for last player
         if (nextsValues.includes(lastPlayer.value)) {
-            const nextsValuesNotLastPlayer = nextsValues.filter(_ => _ != lastPlayer.value);
-            if (nextsValuesNotLastPlayer.length === 0) {
+            const nextsValuesUnsureOrWinningForNextPlayer = nextsValues.filter(_ => _ != lastPlayer.value);
+            if (nextsValuesUnsureOrWinningForNextPlayer.length === 0) {
                 return checkNotNan(lastPlayer.value);
             } else {
                 // some moves are winning for lastPlayer, but nextPlayer is unlikely to play them.
                 // just add a few points for lastPlayer.
-                return checkNotNan(nextPlayer.minmax(nextsValuesNotLastPlayer) + 0.02 * (lastPlayer.value - unsure) * (nextsValues.length - nextsValuesNotLastPlayer.length));
+                return checkNotNan(lastPlayer.attenuate(nextPlayer.getBestValue(nextsValuesUnsureOrWinningForNextPlayer),
+                    nextsValues.length - nextsValuesUnsureOrWinningForNextPlayer.length));
             }
         }
         return checkNotNan(nextPlayer.minmax(nextsValues));
     }
 
     evaluateAllSubsequences() {
-        const lastPlayerValue = Player.getLastPlayer(this.moves).value;
-        this.sequenceValueStorage.storeValue(this.moves, lastPlayerValue);
-        this.sequenceValueStorage.storeValue(this.moves.slice(0, this.moves.length -1), lastPlayerValue);
-        range(this.moves.length - 2, 1).reverse().map(_ => this.moves.slice(0, _)).forEach((subsequence) => {
+        const moves = this.game.moves;
+        const lastPlayerValue = Player.getLastPlayer(moves).value;
+        this.sequenceValueStorage.storeValue(moves, lastPlayerValue);
+        this.sequenceValueStorage.storeValue(moves.slice(0, moves.length -1), lastPlayerValue);
+        range(moves.length - 2, 1).reverse().map(_ => moves.slice(0, _)).forEach((subsequence) => {
             const value = this.evaluateSequence(subsequence);
             if (Number.isNaN(value)) {
                 throw new Error();
@@ -190,29 +249,29 @@ class Game {
     }
 
     evaluateNexts(time) {
-        if (this.clock.getTime() < time) {
-            for (let next of this.possibleNexts) {
-                const game = this.copy();
-                game.play(next);
-                setTimeout(() => game.evaluateNexts(time), 0);
-            }
-        }
+        this.evaluateAbstract(time, (gameCopy, time) => {setTimeout(() => new Evaluator(gameCopy, null, this.sequenceValueStorage).evaluateNexts(time), 0);});
     }
 
     evaluateNextsSync(time) {
-        if (!time || this.clock.getTime() < time) {
-            for (let next of this.possibleNexts) {
-                const game = this.copy();
-                game.play(next);
-                game.evaluateNextsSync(time);
+        this.evaluateAbstract(time, (gameCopy, time) => {new Evaluator(gameCopy, null, this.sequenceValueStorage).evaluateNextsSync(time);});
+    }
+
+    evaluateAbstract(time, f) {
+        if (!time || this.game.clock.getTime() < time) {
+            const value = this.getSequenceValue(this.game.moves);
+            if (!firstPlayer.isWinning(value) && !secondPlayer.isWinning(value)) {
+                for (let next of this.game.possibleNexts) {
+                    const gameCopy = this.game.copy();
+                    gameCopy.play(next);
+                    f(gameCopy, time);
+                }
             }
         }
     }
 
-
     // choose best next move for bot who plays second
     chooseNext() {
-        const possibleNextsValues = this.possibleNexts.map(move => {return {move, value:this.getMoveValue(move)};});
+        const possibleNextsValues = this.game.possibleNexts.map(move => {return {move, value:this.getMoveValue(move)};});
         console.debug('possibleNextsValues', possibleNextsValues);
         const winning = possibleNextsValues.find(_ => _.value < probableSecondPlayer);
         if (winning) {
@@ -232,24 +291,15 @@ class Game {
         }
     }
 
-    play(current) {
-        this.moves.push(current);
-        this.currentPlayer = this.currentPlayer.getOtherPlayer();
-        this.possibleNexts = [...this.nextss[current]];
-        this.nextss = this.nextss.map((nexts, iNexts) => {
-            return nexts.filter(next => next != current);
-        });
-        this.nextss[current] = [];
-        if (this.possibleNexts.length === 0) {
-            // the game is over
-            this.evaluateAllSubsequences();
-            this.gameOverCallback?.(this.moves.length % 2);
-        }
+    getMoveValue(nextId) {
+        return this.getSequenceValue([...this.game.moves, nextId]);
+    }
+    
+    onGameOver(winner) {
+        this.evaluateAllSubsequences();
+        this.gameOverCallback(winner);
     }
 
-    getMoveValue(nextId) {
-        return this.getSequenceValue([...this.moves, nextId]);
-    }
 }
 
 class LocalStorageSequenceValueStorage {

@@ -51,7 +51,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     const svg = document.querySelector('#svg');
     svg.innerHTML = await (await fetch(`${path}.svg`)).text();
     svg.replaceWith(...svg.childNodes);
-    game = new Game(nextss, JSON.parse(JSON.stringify(nextss)), new LocalStorageSequenceValueStorage(), new Clock(), onGameOver);
+    game = new Game(nextss, JSON.parse(JSON.stringify(nextss)), new Clock(), null);
+    const evaluator = new Evaluator(game, onGameOver, new LocalStorageSequenceValueStorage());
+    game.gameOverCallback = evaluator.onGameOver.bind(evaluator);
     moveEdgesLast();
     voronoize();
 
@@ -72,9 +74,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (tmp && (game.possibleNexts === undefined || game.possibleNexts.includes(getNodeId(tmp)))) {
             play(tmp);
             if (game.possibleNexts.length > 0) {
-                game.evaluateNexts(game.clock.getTime() + 900);
+                evaluator.evaluateNexts(game.clock.getTime() + 900);
                 setTimeout(() => {
-                    const botChoice = game.chooseNext();
+                    const botChoice = evaluator.chooseNext();
                     const botElement = document.querySelector(`g#id${botChoice}`);
                     play(botElement);
                 }, 1000);
