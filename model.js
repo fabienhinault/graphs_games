@@ -265,14 +265,12 @@ class Evaluator {
     evaluateAbstract(time, f) {
         if (!time || this.game.clock.getTime() < time) {
             const value = this.getSequenceValue(this.game.moves);
-            if (!firstPlayer.isWinning(value) && !secondPlayer.isWinning(value)) {
-                for (let next of this.game.possibleNexts) {
-                    const gameCopy = this.game.copy();
-                    const evaluator = new Evaluator(gameCopy, null, this.sequenceValueStorage);
-                    gameCopy.gameOverCallback = evaluator.onGameOver.bind(evaluator); 
-                    gameCopy.play(next);
-                    f(evaluator, time);
-                }
+            for (let next of this.game.possibleNexts) {
+                const gameCopy = this.game.copy();
+                const evaluator = new Evaluator(gameCopy, null, this.sequenceValueStorage);
+                gameCopy.gameOverCallback = evaluator.onGameOver.bind(evaluator); 
+                gameCopy.play(next);
+                f(evaluator, time);
             }
         }
     }
@@ -301,7 +299,7 @@ class Evaluator {
     
     onGameOver(winner) {
         this.evaluateAllSubsequences();
-        this.gameOverCallback(winner);
+        this.gameOverCallback?.(winner);
     }
 
 }
