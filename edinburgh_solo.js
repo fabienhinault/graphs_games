@@ -60,9 +60,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     function play(tmp) {
         previous = current;
         current = tmp;
-        const idString = getNodeId(current); 
-        const idNumber = Number(idString);
+        const idNumber = getNodeId(current);
         game.play(idNumber);
+        evaluator.pushValue();
         updateSvgCurrentVertex();
         if (previous !== undefined) {
             updateSvgLastVertex(previous);
@@ -79,6 +79,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     const botChoice = evaluator.chooseNext();
                     const botElement = document.querySelector(`g#id${botChoice}`);
                     play(botElement);
+                    console.debug(evaluator.getSequenceValue(game.moves));
                     console.debug(localStorage.length);
                 }, 1000);
             }
