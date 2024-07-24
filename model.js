@@ -190,6 +190,7 @@ class Evaluator {
         this.game = game;
         this.gameOverCallback = gameOverCallback;
         this.sequenceValueStorage= sequenceValueStorage;
+        this.values = [];
     }
 
     /* The value of a sequence says if the sequence is winning for firstPlayer or secondPlayer.
@@ -272,11 +273,13 @@ class Evaluator {
     // choose best next move for bot who plays second
     chooseNext() {
         const possibleNextsValues = this.game.possibleNexts.map(move => {return {move, value:this.getMoveValue(move)};});
-        const winning = possibleNextsValues.find(_ => _.value < probableSecondPlayer);
+        console.debug(possibleNextsValues);
+        const winning = possibleNextsValues.find(mv => secondPlayer.isWinning(mv.value));
         if (winning) {
+            console.debug(`winning ${winning}`);
             return winning.move;
         }
-        const notLosings = possibleNextsValues.filter(_ => _.value <= probableFirstPlayer);
+        const notLosings = possibleNextsValues.filter(mv => !firstPlayer.isWinning(mv.value));
         if (notLosings.length >= 1) {
             const weighteds = notLosings.map(_ => {
                 return {move: _.move, weight: otherPlayerValue(_.value)};
@@ -294,6 +297,17 @@ class Evaluator {
     onGameOver(winner) {
         this.evaluateAllSubsequences();
         this.gameOverCallback?.(winner);
+    }
+
+    pushValue() {
+        this.values.push(this.getSequenceValue(this.game.moves));
+        if (this.values.length > 1) {
+            const previous = this.values[this.values.length - 2];
+            const last = this.values[this.values.length - 1];
+            if (secondPlayer.isWinning(previous) && previous < last) {
+                console.warn(this.values);
+            }
+        }
     }
 
 }
