@@ -90,6 +90,15 @@ describe('edinburgh_solo', function () {
         assert.equal(evaluator.evaluateSequence([0]), 20);
     });
 
+    it('wl2', function () {
+        const {game, evaluator} = createGame([[1], [0, 2, 3], [1], [1]]);
+        game.play(0);
+        const map = evaluator.sequenceValueStorage.values;
+        map.set("0,1,2", 890);
+        map.set("0,1,3", 0);
+        assert.equal(evaluator.evaluateSequence([0,1]), 870);
+    });
+
     it('uu', function () {
         const {game, evaluator} = createGame([[1, 2], [0], [0]]);
         const map = evaluator.sequenceValueStorage.values;
@@ -104,6 +113,15 @@ describe('edinburgh_solo', function () {
         map.set("0,1", unsure);
         map.set("0,2", secondPlayerValue);
         assert.equal(evaluator.evaluateSequence([0]), 20);
+    });
+
+    it('ul2', function () {
+        const {game, evaluator} = createGame([[1], [0, 2, 3], [1], [1]]);
+        game.play(0);
+        const map = evaluator.sequenceValueStorage.values;
+        map.set("0,1,2", unsure);
+        map.set("0,1,3", secondPlayerValue);
+        assert.equal(evaluator.evaluateSequence([0,1]), unsure);
     });
 
     it('ll', function () {
@@ -133,6 +151,15 @@ describe('edinburgh_solo', function () {
         assert.equal(evaluator.evaluateSequence([0]), 30);
     });
 
+    it('wul', function () {
+        const {game, evaluator} = createGame([[1, 2, 3], [0], [0], [0]]);
+        const map = evaluator.sequenceValueStorage.values;
+        map.set("0,1", firstPlayerValue);
+        map.set("0,2", unsure);
+        map.set("0,3", secondPlayerValue);
+        assert.equal(evaluator.evaluateSequence([0]), 30);
+    });
+
 
 //   0--1--2--3--4--5
 //               | /
@@ -143,6 +170,14 @@ describe('edinburgh_solo', function () {
         evaluator.evaluateNextsSync();
         const possibleNextsValues = game.possibleNexts.map(move => {return {move, value:evaluator.getMoveValue(move)};});
         assert.deepEqual(possibleNextsValues, [{move: 4, value: 1000}, {move: 5, value: 960}]);
+    });
+
+    it('evaluateNext(Sync), ul', function () {
+        const {game, evaluator} = createGame([[1], [0, 2, 3], [1], [1, 4], [3]]);
+        game.play(0);
+        evaluator.evaluateNextsSync();
+        const possibleNextsValues = game.possibleNexts.map(move => {return {move, value:evaluator.getMoveValue(move)};});
+        assert.deepEqual(possibleNextsValues, [{move: 1, value: 980}]);
     });
 
     it('game.winnings', function () {
@@ -223,9 +258,7 @@ describe('edinburgh_solo', function () {
         game.play("12");
         evaluator.evaluateNextsSync();
         const possibleNextsValues = game.possibleNexts.map(move => {return {move, value:evaluator.getMoveValue(move)};});
-        assert.deepEqual(possibleNextsValues, [{move: 21, value: 940}, {move: 28, value: 500}, {move: 11, value: 490}]);
-        // assert.isFalse(game.winnings.has("28"));
-        // assert.isFalse(game.losings.has("21"));
+        assert.deepEqual(possibleNextsValues, [{move: 21, value: 940}, {move: 28, value: 500}, {move: 11, value: 500}]);
     });
 
     it('evaluate', function () {
@@ -236,7 +269,7 @@ describe('edinburgh_solo', function () {
         const evaluator = new Evaluator(game, null, new LocalStorageSequenceValueStorage());
         game.gameOverCallback = evaluator.onGameOver.bind(evaluator);
         evaluator.sequenceValueStorage.storeValue([7,5,6,9,12,3], firstPlayer.value);
-        assert.equal(evaluator.evaluateSequence([7,5,6,9,12]), 510);
+        assert.equal(evaluator.evaluateSequence([7,5,6,9,12]), 500);
     });
 
     it('false winning', function () {
@@ -257,6 +290,16 @@ describe('edinburgh_solo', function () {
         game.play("12");
         game.play("9");
         assert.equal(evaluator.chooseNext(), "8");
+    });
+
+    it('chooseNext wul', function () {
+        const {game, evaluator} = createGame([[1, 2, 3], [0], [0], [0]]);
+        const map = evaluator.sequenceValueStorage.values;
+        map.set("0,1", firstPlayerValue);
+        map.set("0,2", unsure);
+        map.set("0,3", secondPlayerValue);
+        game.play(0);
+        assert.equal(evaluator.chooseNext(), 3);
     });
 
 });
