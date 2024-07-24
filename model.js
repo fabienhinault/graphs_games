@@ -276,8 +276,7 @@ class Evaluator {
         console.debug(possibleNextsValues);
         const winning = possibleNextsValues.find(mv => secondPlayer.isWinning(mv.value));
         if (winning) {
-            console.debug(`winning ${winning}`);
-            return winning.move;
+            return pick(argsMin(possibleNextsValues, _ => _.value)).move;
         }
         const notLosings = possibleNextsValues.filter(mv => !firstPlayer.isWinning(mv.value));
         if (notLosings.length >= 1) {
