@@ -69,21 +69,27 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
+    function robotPlays() {
+        const botChoice = evaluator.chooseNext();
+        const botElement = document.querySelector(`g#id${botChoice}`);
+        play(botElement);
+        console.debug(evaluator.getSequenceValue(game.moves));
+        console.debug(localStorage.length);
+    }
+
     document.body.onclick = (event) => {
         const tmp = event.target.closest('svg > g > g.node');
         if (tmp && (game.possibleNexts === undefined || game.possibleNexts.includes(getNodeId(tmp)))) {
             play(tmp);
             if (game.possibleNexts.length > 0) {
                 evaluator.evaluateNexts(game.clock.getTime() + 900);
-                setTimeout(() => {
-                    const botChoice = evaluator.chooseNext();
-                    const botElement = document.querySelector(`g#id${botChoice}`);
-                    play(botElement);
-                    console.debug(evaluator.getSequenceValue(game.moves));
-                    console.debug(localStorage.length);
-                }, 1000);
+                setTimeout(robotPlays, 1000);
             }
         }
+    }
+
+    document.querySelector('#robot_begins').onclick = (event) => {
+        robotPlays();
     }
 });
 
