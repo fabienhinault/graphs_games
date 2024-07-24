@@ -64,6 +64,7 @@ class Player {
     constructor(value, bestValueFunction, attenuationFactor) {
         this.value = value;
         this.bestValueFunction = bestValueFunction;
+        this.attenuationFactor = attenuationFactor;
     }
     
     getOtherPlayer() {
@@ -92,7 +93,7 @@ class Player {
     // For example a sequence with one winning next move and many losing next moves is not as winning as
     // a sequence with only winning next moves and no losing next move.
     attenuate(value, weight) {
-        return value - attenuationFactor * weight; 
+        return value - this.attenuationFactor * weight; 
     }
 
     // wether the value of a sequence is winning for player
@@ -101,9 +102,9 @@ class Player {
     }
 }
 
-const attenuationFactor = 0.02 * (firstPlayerValue - unsure);
-const firstPlayer = new Player(firstPlayerValue, Math.max, attenuationFactor);
-const secondPlayer = new Player(secondPlayerValue, Math.min, -attenuationFactor);
+const firstAttenuationFactor = 0.02 * (firstPlayerValue - unsure);
+const firstPlayer = new Player(firstPlayerValue, Math.max, firstAttenuationFactor);
+const secondPlayer = new Player(secondPlayerValue, Math.min, -firstAttenuationFactor);
 let players = [];
 [firstPlayer, secondPlayer].forEach(p => {players[p.value] = p;});
 let otherPlayers = [firstPlayer];
@@ -194,6 +195,7 @@ class Evaluator {
     /* The value of a sequence says if the sequence is winning for firstPlayer or secondPlayer.
      * It is winning for firstPlayer if the value is close to firstPlayerValue, and same for secondPlayer.
      * The value of the sequence depends on the value of its successors.
+     * All players are considered good. If a winning move exists, the evaluation supposes she will take it.
      */
     evaluateSequence(sequence) {
         const lastMove = sequence[sequence.length - 1];
@@ -202,24 +204,16 @@ class Evaluator {
         const nextPlayer = lastPlayer.getOtherPlayer();
         const nexts = this.game.initialNextss[lastMove].filter(_ => !sequence.includes(_));
         const nextsValues = nexts.map(next => this.getSequenceValue([...sequence, next]));
-        const nextsValuesUnsureOrWinningForLastPlayer = nextsValues.filter(v => !nextPlayer.isWinning(v));
-        const thereIsSomeNextValueWinningForNextPlayer = nextsValues.some(v => nextPlayer.isWinning(v));
-        if (thereIsSomeNextValueWinningForNextPlayer) {
-             return checkNotNan(nextPlayer.attenuate(nextPlayer.getBestValue(nextsValues), nextsValuesUnsureOrWinningForLastPlayer.length + 1));
+        const bestValue = nextPlayer.getBestValue(nextsValues);
+        if (nextPlayer.isWinning(bestValue)) {
+            // the current sequence is considered winning for nextPlayer.
+            // attenuated for the possible losing moves, and the distance.
+            return checkNotNan(nextPlayer.attenuate(bestValue, nextsValues.filter(v => !nextPlayer.isWinning(v)).length + 1));
         }
-        // only unsure or winning for last player
-        if (nextsValues.includes(lastPlayer.value)) {
-            const nextsValuesUnsureOrWinningForNextPlayer = nextsValues.filter(_ => _ != lastPlayer.value);
-            if (nextsValuesUnsureOrWinningForNextPlayer.length === 0) {
-                return checkNotNan(lastPlayer.value);
-            } else {
-                // some moves are winning for lastPlayer, but nextPlayer is unlikely to play them.
-                // just add a few points for lastPlayer.
-                return checkNotNan(lastPlayer.attenuate(nextPlayer.getBestValue(nextsValuesUnsureOrWinningForNextPlayer),
-                    nextsValues.length - nextsValuesUnsureOrWinningForNextPlayer.length));
-            }
+        if (lastPlayer.isWinning(bestValue)) {
+            return checkNotNan(lastPlayer.attenuate(bestValue, nextsValues.filter(v => !lastPlayer.isWinning(v)).length + 1));
         }
-        return checkNotNan(nextPlayer.minmax(nextsValues));
+        return checkNotNan(bestValue);
     }
 
     evaluateAllSubsequences() {

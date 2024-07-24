@@ -45,13 +45,92 @@ describe('edinburgh_solo', function () {
     });
 
 
+    it('w', function () {
+        const {game, evaluator} = createGame([[1], [0]]);
+        const map = evaluator.sequenceValueStorage.values;
+        map.set("0,1", firstPlayerValue);
+        assert.equal(evaluator.evaluateSequence([0]), 990);
+    });
+
+    it('u', function () {
+        const {game, evaluator} = createGame([[1], [0]]);
+        const map = evaluator.sequenceValueStorage.values;
+        map.set("0,1", unsure);
+        assert.equal(evaluator.evaluateSequence([0]), unsure);
+    });
+
+    it('l', function () {
+        const {game, evaluator} = createGame([[1], [0]]);
+        const map = evaluator.sequenceValueStorage.values;
+        map.set("0,1", secondPlayerValue);
+        assert.equal(evaluator.evaluateSequence([0]), 10);
+    });
+
+    it('ww', function () {
+        const {game, evaluator} = createGame([[1, 2], [0], [0]]);
+        const map = evaluator.sequenceValueStorage.values;
+        map.set("0,1", firstPlayerValue);
+        map.set("0,2", firstPlayerValue);
+        assert.equal(evaluator.evaluateSequence([0]), 990);
+    });
+
+    it('wu', function () {
+        const {game, evaluator} = createGame([[1, 2], [0], [0]]);
+        const map = evaluator.sequenceValueStorage.values;
+        map.set("0,1", firstPlayerValue);
+        map.set("0,2", unsure);
+        assert.equal(evaluator.evaluateSequence([0]), unsure);
+    });
+
+    it('wl', function () {
+        const {game, evaluator} = createGame([[1, 2], [0], [0]]);
+        const map = evaluator.sequenceValueStorage.values;
+        map.set("0,1", firstPlayerValue);
+        map.set("0,2", secondPlayerValue);
+        assert.equal(evaluator.evaluateSequence([0]), 20);
+    });
+
+    it('uu', function () {
+        const {game, evaluator} = createGame([[1, 2], [0], [0]]);
+        const map = evaluator.sequenceValueStorage.values;
+        map.set("0,1", unsure);
+        map.set("0,2", unsure);
+        assert.equal(evaluator.evaluateSequence([0]), unsure);
+    });
+
+    it('ul', function () {
+        const {game, evaluator} = createGame([[1, 2], [0], [0]]);
+        const map = evaluator.sequenceValueStorage.values;
+        map.set("0,1", unsure);
+        map.set("0,2", secondPlayerValue);
+        assert.equal(evaluator.evaluateSequence([0]), 20);
+    });
+
+    it('ll', function () {
+        const {game, evaluator} = createGame([[1, 2], [0], [0]]);
+        const map = evaluator.sequenceValueStorage.values;
+        map.set("0,1", secondPlayerValue);
+        map.set("0,2", secondPlayerValue);
+        assert.equal(evaluator.evaluateSequence([0]), 10);
+    });
+
     it('www', function () {
         const {game, evaluator} = createGame([[1, 2, 3], [0], [0], [0]]);
         const map = evaluator.sequenceValueStorage.values;
         map.set("0,1", firstPlayerValue);
         map.set("0,2", firstPlayerValue);
         map.set("0,3", firstPlayerValue);
-        assert.equal(evaluator.evaluateSequence([0]), firstPlayerValue);
+        assert.equal(evaluator.evaluateSequence([0]), 990);
+    });
+
+
+    it('wwl', function () {
+        const {game, evaluator} = createGame([[1, 2, 3], [0], [0], [0]]);
+        const map = evaluator.sequenceValueStorage.values;
+        map.set("0,1", firstPlayerValue);
+        map.set("0,2", firstPlayerValue);
+        map.set("0,3", secondPlayerValue);
+        assert.equal(evaluator.evaluateSequence([0]), 30);
     });
 
 
@@ -59,14 +138,11 @@ describe('edinburgh_solo', function () {
 //               | /
 //               6
     it('evaluateNext(Sync), long path', function () {
-        nextss = [[1], [0, 2], [1, 3], [2, 4], [3, 5, 6], [4, 6], [4, 5]];
-        const game = new Game(nextss, JSON.parse(JSON.stringify(nextss)), new MemorySequenceValueStorage(), new Clock(), null);
-        const evaluator = new Evaluator(game, null, new LocalStorageSequenceValueStorage());
-        game.gameOverCallback = evaluator.onGameOver.bind(evaluator);
+        const {game, evaluator} = createGame([[1], [0, 2], [1, 3], [2, 4], [3, 5, 6], [4, 6], [4, 5]]);
         game.play(6);
         evaluator.evaluateNextsSync();
         const possibleNextsValues = game.possibleNexts.map(move => {return {move, value:evaluator.getMoveValue(move)};});
-        assert.deepEqual(possibleNextsValues, [{move: 4, value: 1000}, {move: 5, value: 980}]);
+        assert.deepEqual(possibleNextsValues, [{move: 4, value: 1000}, {move: 5, value: 960}]);
     });
 
     it('game.winnings', function () {
