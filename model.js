@@ -31,10 +31,10 @@ function pickWeighted(weighteds) {
     return weighteds[summedWeights.findIndex(aw => aw >= r)];
 }
 
-function min(array, f) {
+function optimum(array, f, compare, initialValue) {
     return array.reduce((acc, cur) => {
         const currentValue = f(cur);
-        if (currentValue < acc.value) {
+        if (compare(currentValue, acc.value)) {
             return {elements: [cur], value: currentValue};
         } else if (currentValue === acc.value) {
             return {elements: [...acc.elements, cur], value: currentValue};
@@ -42,11 +42,27 @@ function min(array, f) {
             return acc;
         }
     },
-    {value: Number.MAX_VALUE});
+    {value: initialValue});
+}
+
+function argsOpt(array, f, compare, initialValue) {
+    return optimum(array, f, compare, initialValue).elements;
+}
+
+function min(array, f) {
+    return optimum(array, f, (x,y) => x < y, Number.MAX_VALUE)
 }
 
 function argsMin(array, f) {
     return min(array, f).elements;
+}
+
+function max(array, f) {
+    return optimum(array, f, (x,y) => x > y, -Number.MAX_VALUE)
+}
+
+function argsMax(array, f) {
+    return max(array, f).elements;
 }
 
 class Clock {
@@ -61,18 +77,21 @@ const unsure = (firstPlayerValue + secondPlayerValue) / 2;
 const valueThreshold = Math.abs((firstPlayerValue - secondPlayerValue) / 4);
 
 class Player {
-    constructor(value, bestValueFunction, attenuationFactor) {
+    constructor(value, bestValueFunction, attenuationFactor, argsBestFunction, straightenFunction) {
+        this.name = '';
         this.value = value;
         this.bestValueFunction = bestValueFunction;
         this.attenuationFactor = attenuationFactor;
+        this.argsBestFunction = argsBestFunction;
+        this.straightenFunction = straightenFunction;
     }
     
     getOtherPlayer() {
-        return otherPlayers[this.value];
+        return otherPlayers[players.indexOf(this)];
     }
     
     static getLastPlayer(moves) {
-        return players[(moves.length % 2) * firstPlayerValue];
+        return players[(moves.length % 2)];
     }
     
     getProbable() {
@@ -83,8 +102,8 @@ class Player {
         return this.bestValueFunction(...nextsValues);
     }
 
-    minmax(nextsValues) {
-        return minmaxes[this.value](...nextsValues);
+    getArgsBest(moves, f) {
+        return this.argsBestFunction(moves, f);
     }
 
     // attenuate the value to be given to a sequence.
@@ -100,26 +119,17 @@ class Player {
     isWinning(sequenceValue) {
         return Math.abs(sequenceValue - this.value) < valueThreshold;
     }
+
+    getStraightenedValue(sequenceValue) {
+        return this.straightenFunction(sequenceValue);
+    }
 }
 
 const firstAttenuationFactor = 0.02 * (firstPlayerValue - unsure);
-const firstPlayer = new Player(firstPlayerValue, Math.max, firstAttenuationFactor);
-const secondPlayer = new Player(secondPlayerValue, Math.min, -firstAttenuationFactor);
-let players = [];
-[firstPlayer, secondPlayer].forEach(p => {players[p.value] = p;});
-let otherPlayers = [firstPlayer];
-otherPlayers[firstPlayer.value] = secondPlayer;
-let minmaxes = [Math.min];
-minmaxes[firstPlayer.value] = Math.max;
-const probableFirstPlayer = firstPlayer.getProbable();
-const probableSecondPlayer = secondPlayer.getProbable();
-const sequenceValuesMap = new Map([
-    [probableSecondPlayer, probableSecondPlayer],
-    [(probableSecondPlayer + unsure) / 2 , probableSecondPlayer],
-    [unsure, unsure],
-    [(unsure + probableFirstPlayer) / 2, probableFirstPlayer], 
-    [probableFirstPlayer, probableFirstPlayer]
-]);
+const firstPlayer = new Player(firstPlayerValue, Math.max, firstAttenuationFactor, argsMax, x => x);
+const secondPlayer = new Player(secondPlayerValue, Math.min, -firstAttenuationFactor, argsMin, x => firstPlayerValue - x);
+let players = [secondPlayer, firstPlayer];
+let otherPlayers = [firstPlayer, secondPlayer];
 
 function otherPlayerValue(playerValue) {
     return firstPlayerValue - playerValue;
@@ -136,7 +146,7 @@ class Game {
     constructor(nextss, initialNextss, clock, gameOverCallback) {
         this.nextss = nextss;
         this.moves = [];
-        this.possibleNexts = undefined;
+        this.possibleNexts = range(nextss.length);
         this.initialNextss = initialNextss;
         this.clock = clock;
         this.gameOverCallback = gameOverCallback;
@@ -171,7 +181,7 @@ class Game {
         this.nextss[current] = [];
         if (this.possibleNexts.length === 0) {
             // the game is over
-            this.gameOverCallback?.(this.moves.length % 2);
+            this.gameOverCallback?.(players[this.moves.length % 2].name);
         }
     }
 
@@ -186,11 +196,12 @@ class Game {
 
 
 class Evaluator {
-    constructor(game, gameOverCallback, sequenceValueStorage) {
+    constructor(game, gameOverCallback, sequenceValueStorage, player) {
         this.game = game;
         this.gameOverCallback = gameOverCallback;
         this.sequenceValueStorage= sequenceValueStorage;
         this.values = [];
+        this.player = player ?? secondPlayer;
     }
 
     /* The value of a sequence says if the sequence is winning for firstPlayer or secondPlayer.
@@ -274,18 +285,19 @@ class Evaluator {
     chooseNext() {
         const possibleNextsValues = this.game.possibleNexts.map(move => {return {move, value:this.getMoveValue(move)};});
         console.debug(possibleNextsValues);
-        const winning = possibleNextsValues.find(mv => secondPlayer.isWinning(mv.value));
+        const winning = possibleNextsValues.find(mv => this.player.isWinning(mv.value));
         if (winning) {
-            return pick(argsMin(possibleNextsValues, _ => _.value)).move;
+            return pick(this.player.getArgsBest(possibleNextsValues, _ => _.value)).move;
         }
-        const notLosings = possibleNextsValues.filter(mv => !firstPlayer.isWinning(mv.value));
+        const otherPlayer = this.player.getOtherPlayer()
+        const notLosings = possibleNextsValues.filter(mv => !otherPlayer.isWinning(mv.value));
         if (notLosings.length >= 1) {
             const weighteds = notLosings.map(_ => {
-                return {move: _.move, weight: otherPlayerValue(_.value)};
+                return {move: _.move, weight: this.player.getStraightenedValue(_.value)};
             });
             return (pickWeighted(weighteds)).move;
         } else {
-            return pick(argsMin(possibleNextsValues, _ => _.value)).move;
+            return pick(this.player.getArgsBest(possibleNextsValues, _ => _.value)).move;
         }
     }
 
@@ -325,3 +337,4 @@ class LocalStorageSequenceValueStorage {
         localStorage.removeItem(sequence);
     }
 }
+
