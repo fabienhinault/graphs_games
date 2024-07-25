@@ -45,6 +45,8 @@
 #player2_won.player1_won {
     display: none;
 }
-
+#robot_begins.started {
+    display: none;
+}
 
 
