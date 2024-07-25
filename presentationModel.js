@@ -3,8 +3,8 @@ let previous;
 let current;
 let game;
 
-function onGameOver(winner) {
-    const klass = ['robot_won', 'player_won'][winner];
+function onGameOver(winnerName) {
+    const klass = `${winnerName}_won`;
     ['#robot_won', '#player_won']
         .map(idSelector => document.querySelector(idSelector))
         .forEach(img => img.setAttribute('class', klass));
