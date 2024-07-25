@@ -35,7 +35,7 @@ function voronoize() {
     let voronoi = new Voronoi();
     const bbox = {xl: points[0].x, xr: points[2].x, yt: points[1].y, yb: points[0].y};
     const vertices = [...document.querySelectorAll('#graph0 > g.node')];
-    let sites = vertices.map(g => g.querySelector('ellipse')).map(e => {return {x: Number(e.getAttribute('cx')), y: Number(e.getAttribute('cy'))};});
+    let sites = vertices.map(g => g.querySelector('ellipse')).map(e => { return { x: Number(e.getAttribute('cx')), y: Number(e.getAttribute('cy')) }; });
     const diagram = voronoi.compute(sites, bbox);
     const svg = box.closest('svg');
     for (let iVertex = 0; iVertex < vertices.length; iVertex++) {
@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     svg.innerHTML = await (await fetch(`${path}.svg`)).text();
     svg.replaceWith(...svg.childNodes);
     game = new Game(nextss, JSON.parse(JSON.stringify(nextss)), new Clock(), null);
-    const evaluator = new Evaluator(game, onGameOver, new LocalStorageSequenceValueStorage());
+    const evaluator = new Evaluator(game, onGameOver, new LocalStorageSequenceValueStorage(), null);
     game.gameOverCallback = evaluator.onGameOver.bind(evaluator);
     moveEdgesLast();
     voronoize();
@@ -73,11 +73,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         const botChoice = evaluator.chooseNext();
         const botElement = document.querySelector(`g#id${botChoice}`);
         play(botElement);
+        document.body.addEventListener('click', onClick);
         console.debug(evaluator.getSequenceValue(game.moves));
         console.debug(localStorage.length);
     }
 
-    document.body.onclick = (event) => {
+    function onClick(event) {
+        document.body.removeEventListener('click', onClick);
         const tmp = event.target.closest('svg > g > g.node');
         if (tmp && (game.possibleNexts === undefined || game.possibleNexts.includes(getNodeId(tmp)))) {
             play(tmp);
@@ -88,7 +90,24 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
+    function onFirstClick(event) {
+        firstPlayer.name = 'player';
+        secondPlayer.name = 'robot';
+        document.querySelector('button#robot_begins').setAttribute('class', 'started');
+        evaluator.player = secondPlayer;
+        onClick(event);
+
+    }
+
+    document.body.addEventListener('click', onFirstClick);
+
     document.querySelector('#robot_begins').onclick = (event) => {
+        firstPlayer.name = 'robot';
+        secondPlayer.name = 'player';
+        document.querySelector('button#robot_begins').setAttribute('class', 'started');
+        evaluator.player = firstPlayer;
+        document.body.removeEventListener('click', onFirstClick);
+        event.stopPropagation();
         robotPlays();
     }
 });
