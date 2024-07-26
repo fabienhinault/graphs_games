@@ -1,5 +1,6 @@
 "use strict";
 
+import {firstPlayer, secondPlayer, Game, Evaluator, LocalStorageSequenceValueStorage, Clock} from './model.js';
 
 function createSvgPoint(svg, vertex) {
     let svgPoint = svg.createSVGPoint();
@@ -45,13 +46,50 @@ function voronoize() {
     }
 }
 
+function onGameOver(winnerName) {
+    const klass = `${winnerName}_won`;
+    ['#robot_won', '#player_won']
+        .map(idSelector => document.querySelector(idSelector))
+        .forEach(img => img.setAttribute('class', klass));
+}
+
+function getNodeId(svgNode) {
+    // remove "id"
+    return Number(svgNode.id.substring(2));
+}
+
+function updateSvgCurrentVertex(currentSvgNode) {
+    let ellipse = currentSvgNode.querySelector('ellipse');
+    ellipse.setAttribute('fill', 'gray');
+}
+
+function updateSvgLastVertex(previousSvgNode, game) {
+    document.querySelectorAll(`g._${getNodeId(previousSvgNode)}_`).forEach(g => {
+        if (g.getAttribute('class').includes(`_${game.getCurrentMove()}_`)) {
+            g.querySelector('path').setAttribute('stroke', 'lightgray');
+        } else if (game.moves.length < 3 || !g.getAttribute('class').includes(`_${game.moves[game.moves.length - 3]}_`)) {
+            g.remove();
+        }
+    });
+    const lastCircle = previousSvgNode.querySelector('ellipse');
+    lastCircle.setAttribute('stroke', 'lightgray');
+    lastCircle.setAttribute('fill', 'none');
+    if (game.moves.length === 2) {
+        lastCircle.setAttribute('stroke-width', '3');
+    }
+    previousSvgNode.querySelector('text').setAttribute('style', 'fill: lightgray;');
+}
+
+
 document.addEventListener('DOMContentLoaded', async function() {
     const path = new URL(window.location.toLocaleString()).searchParams.get('path');
     const {nextss} = await import(`${path}.js`);
     const svg = document.querySelector('#svg');
     svg.innerHTML = await (await fetch(`${path}.svg`)).text();
     svg.replaceWith(...svg.childNodes);
-    game = new Game(nextss, JSON.parse(JSON.stringify(nextss)), new Clock(), null);
+    let game = new Game(nextss, JSON.parse(JSON.stringify(nextss)), new Clock(), null);
+    let current;
+    let previous;
     const evaluator = new Evaluator(game, onGameOver, new LocalStorageSequenceValueStorage(), null);
     game.gameOverCallback = evaluator.onGameOver.bind(evaluator);
     moveEdgesLast();
@@ -63,9 +101,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         const idNumber = getNodeId(current);
         game.play(idNumber);
         evaluator.pushValue();
-        updateSvgCurrentVertex();
+        updateSvgCurrentVertex(current);
         if (previous !== undefined) {
-            updateSvgLastVertex(previous);
+            updateSvgLastVertex(previous, game);
         }
     }
 
@@ -96,7 +134,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.querySelector('button#robot_begins').setAttribute('class', 'started');
         evaluator.player = secondPlayer;
         onClick(event);
-
     }
 
     document.body.addEventListener('click', onFirstClick);
