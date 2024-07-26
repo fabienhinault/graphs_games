@@ -65,7 +65,7 @@ function argsMax(array, f) {
     return max(array, f).elements;
 }
 
-class Clock {
+export class Clock {
     getTime() {
         return Date.now();
     }
@@ -126,8 +126,8 @@ class Player {
 }
 
 const firstAttenuationFactor = 0.02 * (firstPlayerValue - unsure);
-const firstPlayer = new Player(firstPlayerValue, Math.max, firstAttenuationFactor, argsMax, x => x);
-const secondPlayer = new Player(secondPlayerValue, Math.min, -firstAttenuationFactor, argsMin, x => firstPlayerValue - x);
+export const firstPlayer = new Player(firstPlayerValue, Math.max, firstAttenuationFactor, argsMax, x => x);
+export const secondPlayer = new Player(secondPlayerValue, Math.min, -firstAttenuationFactor, argsMin, x => firstPlayerValue - x);
 let players = [secondPlayer, firstPlayer];
 let otherPlayers = [firstPlayer, secondPlayer];
 
@@ -142,7 +142,7 @@ function checkNotNan(n) {
     return n;
 }
 
-class Game {
+export class Game {
     constructor(nextss, initialNextss, clock, gameOverCallback) {
         this.nextss = nextss;
         this.moves = [];
@@ -195,7 +195,7 @@ class Game {
 }
 
 
-class Evaluator {
+export class Evaluator {
     constructor(game, gameOverCallback, sequenceValueStorage, player) {
         this.game = game;
         this.gameOverCallback = gameOverCallback;
@@ -270,7 +270,6 @@ class Evaluator {
 
     evaluateAbstract(time, f) {
         if (!time || this.game.clock.getTime() < time) {
-            const value = this.getSequenceValue(this.game.moves);
             for (let next of this.game.possibleNexts) {
                 const gameCopy = this.game.copy();
                 const evaluator = new Evaluator(gameCopy, null, this.sequenceValueStorage);
@@ -284,7 +283,6 @@ class Evaluator {
     // choose best next move for bot who plays second
     chooseNext() {
         const possibleNextsValues = this.game.possibleNexts.map(move => {return {move, value:this.getMoveValue(move)};});
-        console.debug(possibleNextsValues);
         const winning = possibleNextsValues.find(mv => this.player.isWinning(mv.value));
         if (winning) {
             return pick(this.player.getArgsBest(possibleNextsValues, _ => _.value)).move;
@@ -323,7 +321,7 @@ class Evaluator {
 
 }
 
-class LocalStorageSequenceValueStorage {
+export class LocalStorageSequenceValueStorage {
     storeValue(sequence, value) {
         if (Number.isNaN(value)) {
             throw new Error();
