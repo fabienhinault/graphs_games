@@ -1,49 +1,12 @@
 "use strict";
 
 import {firstPlayer, secondPlayer, Game, Evaluator, LocalStorageSequenceValueStorage, Clock} from './model.js';
-
-function createSvgPoint(svg, vertex) {
-    let svgPoint = svg.createSVGPoint();
-    svgPoint.x = vertex.x;
-    svgPoint.y = vertex.y;
-    return svgPoint;
-}
-
-function createPolygon(svg, svgVertex, cell) {
-    const hes = cell.halfedges;
-    const firstHalfEdge = hes[0];
-    let polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-    polygon.points.appendItem(createSvgPoint(svg, firstHalfEdge.getStartpoint()));
-    for (const halfEdge of hes) {
-        polygon.points.appendItem(createSvgPoint(svg, halfEdge.getEndpoint()));
-    }
-    if (!cell.closeMe) {
-        polygon.points.appendItem(createSvgPoint(svg, firstHalfEdge.getStartpoint()));
-    }
-    polygon.setAttribute('fill', 'white');
-    svgVertex.insertBefore(polygon, svgVertex.firstChild); 
-}
+import { voronoize } from './voronoize.js';
 
 function moveEdgesLast() {
     document.querySelectorAll('#graph0 > g.edge').forEach(g => {
         g.parentElement.appendChild(g);
     });
-}
-
-function voronoize() {
-    const box = document.querySelector('#graph0 > polygon');
-    const points = box.points;
-    let voronoi = new Voronoi();
-    const bbox = {xl: points[0].x, xr: points[2].x, yt: points[1].y, yb: points[0].y};
-    const vertices = [...document.querySelectorAll('#graph0 > g.node')];
-    let sites = vertices.map(g => g.querySelector('ellipse')).map(e => { return { x: Number(e.getAttribute('cx')), y: Number(e.getAttribute('cy')) }; });
-    const diagram = voronoi.compute(sites, bbox);
-    const svg = box.closest('svg');
-    for (let iVertex = 0; iVertex < vertices.length; iVertex++) {
-        const voronoiId = sites[iVertex].voronoiId;
-        const cell = diagram.cells[voronoiId];
-        createPolygon(svg, vertices[iVertex], cell);
-    }
 }
 
 function onGameOver(winnerName) {
@@ -63,7 +26,7 @@ function updateSvgCurrentVertex(currentSvgNode) {
     ellipse.setAttribute('fill', 'gray');
 }
 
-function updateSvgLastVertex(previousSvgNode, game) {
+function updateSvgPreviousVertex(previousSvgNode, game) {
     document.querySelectorAll(`g._${getNodeId(previousSvgNode)}_`).forEach(g => {
         if (g.getAttribute('class').includes(`_${game.getCurrentMove()}_`)) {
             g.querySelector('path').setAttribute('stroke', 'lightgray');
@@ -84,16 +47,18 @@ function updateSvgLastVertex(previousSvgNode, game) {
 document.addEventListener('DOMContentLoaded', async function() {
     const path = new URL(window.location.toLocaleString()).searchParams.get('path');
     const {nextss} = await import(`${path}.js`);
-    const svg = document.querySelector('#svg');
-    svg.innerHTML = await (await fetch(`${path}.svg`)).text();
-    svg.replaceWith(...svg.childNodes);
+    const tmpSvg = document.querySelector('#svg');
+    tmpSvg.innerHTML = await (await fetch(`${path}.svg`)).text();
+    tmpSvg.replaceWith(...tmpSvg.childNodes);
     let game = new Game(nextss, JSON.parse(JSON.stringify(nextss)), new Clock(), null);
     let current;
     let previous;
     const evaluator = new Evaluator(game, onGameOver, new LocalStorageSequenceValueStorage(), null);
     game.gameOverCallback = evaluator.onGameOver.bind(evaluator);
+    const graphElement = document.querySelector('#graph0');
+    const parentSvg = graphElement.closest('svg');
     moveEdgesLast();
-    voronoize();
+    voronoize(parentSvg, graphElement);
 
     function play(tmp) {
         previous = current;
@@ -103,7 +68,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         evaluator.pushValue();
         updateSvgCurrentVertex(current);
         if (previous !== undefined) {
-            updateSvgLastVertex(previous, game);
+            updateSvgPreviousVertex(previous, game);
         }
     }
 
