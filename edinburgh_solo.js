@@ -61,7 +61,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         const parentSvg = graphElement.closest('svg');
         moveEdgesLast();
         voronoize(parentSvg, graphElement);
+        document.body.removeEventListener('click', init);
         document.body.addEventListener('click', onFirstClick);
+        document.querySelectorAll('body > img').forEach(img => img.setAttribute('class', 'playing'));
     }
 
     function onGameOver(winnerName) {
@@ -69,9 +71,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         ['#robot_won', '#player_won']
             .map(idSelector => document.querySelector(idSelector))
             .forEach(img => img.setAttribute('class', klass));
+        document.body.removeEventListener('click', onClick);
         document.body.addEventListener('click', init);
     }
-
 
     function someonePlays(svgNode) {
         previous = current;
@@ -102,7 +104,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     function onClick(event) {
-        const tmp = event.target.closest('svg > g > g.node');
+        const tmp = event.target.closest('g#graph0 > g.node');
         if (tmp && (game.possibleNexts === undefined || game.possibleNexts.includes(getNodeId(tmp)))) {
             document.body.removeEventListener('click', onClick);
             playRound(tmp);
@@ -115,7 +117,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     function onFirstClick(event) {
-        const svgNode = event.target.closest('svg > g > g.node');
+        const svgNode = event.target.closest('g#graph0 > g.node');
         if (svgNode) {
             document.body.removeEventListener('click', onFirstClick);
             removeRobotSvgNode();
@@ -137,8 +139,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         evaluator.player = secondPlayer;
         playRound(svgNode);
     }
-
-
 
     function robotBegins() {
         firstPlayer.name = 'robot';

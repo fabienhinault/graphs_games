@@ -326,7 +326,11 @@ export class LocalStorageSequenceValueStorage {
         if (Number.isNaN(value)) {
             throw new Error();
         }
-        localStorage.setItem(sequence, value);
+        try {
+            localStorage.setItem(sequence, value);
+        } catch (e) {
+            localStorage.clear();
+        }
     }
     getValue(sequence) {
         return localStorage.getItem(sequence);
