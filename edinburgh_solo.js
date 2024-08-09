@@ -9,13 +9,6 @@ function moveEdgesLast() {
     });
 }
 
-function onGameOver(winnerName) {
-    const klass = `${winnerName}_won`;
-    ['#robot_won', '#player_won']
-        .map(idSelector => document.querySelector(idSelector))
-        .forEach(img => img.setAttribute('class', klass));
-}
-
 function getNodeId(svgNode) {
     // remove "id"
     return Number(svgNode.id.substring(2));
@@ -47,22 +40,42 @@ function updateSvgPreviousVertex(previousSvgNode, game) {
 document.addEventListener('DOMContentLoaded', async function() {
     const path = new URL(window.location.toLocaleString()).searchParams.get('path');
     const {nextss} = await import(`${path}.js`);
-    const tmpSvg = document.querySelector('#svg');
-    tmpSvg.innerHTML = await (await fetch(`${path}.svg`)).text();
-    tmpSvg.replaceWith(...tmpSvg.childNodes);
-    let game = new Game(nextss, JSON.parse(JSON.stringify(nextss)), new Clock(), null);
+    const svgContent = await fetch(`${path}.svg`);
+    const svgHtml = await svgContent.text();
+    let game;
     let current;
     let previous;
-    const evaluator = new Evaluator(game, onGameOver, new LocalStorageSequenceValueStorage(), null);
-    game.gameOverCallback = evaluator.onGameOver.bind(evaluator);
-    const graphElement = document.querySelector('#graph0');
-    const parentSvg = graphElement.closest('svg');
-    moveEdgesLast();
-    voronoize(parentSvg, graphElement);
+    let evaluator;
+    init();
 
-    function play(tmp) {
+    function init() {
+        const tmpSvg = document.querySelector('body > svg');
+        tmpSvg.innerHTML = svgHtml;
+        tmpSvg.replaceWith(...tmpSvg.childNodes);
+        game = new Game(nextss, JSON.parse(JSON.stringify(nextss)), new Clock(), null);
+        current = undefined;
+        previous = undefined;
+        evaluator = new Evaluator(game, onGameOver, new LocalStorageSequenceValueStorage(), null);
+        game.gameOverCallback = evaluator.onGameOver.bind(evaluator);
+        const graphElement = document.querySelector('#graph0');
+        const parentSvg = graphElement.closest('svg');
+        moveEdgesLast();
+        voronoize(parentSvg, graphElement);
+        document.body.addEventListener('click', onFirstClick);
+    }
+
+    function onGameOver(winnerName) {
+        const klass = `${winnerName}_won`;
+        ['#robot_won', '#player_won']
+            .map(idSelector => document.querySelector(idSelector))
+            .forEach(img => img.setAttribute('class', klass));
+        document.body.addEventListener('click', init);
+    }
+
+
+    function someonePlays(svgNode) {
         previous = current;
-        current = tmp;
+        current = svgNode;
         const idNumber = getNodeId(current);
         game.play(idNumber);
         evaluator.pushValue();
@@ -73,44 +86,65 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     function robotPlays() {
-        const botChoice = evaluator.chooseNext();
-        const botElement = document.querySelector(`g#id${botChoice}`);
-        play(botElement);
+        const botNodeId = evaluator.chooseNext();
+        const botSvgNode = document.querySelector(`g#id${botNodeId}`);
+        someonePlays(botSvgNode);
         document.body.addEventListener('click', onClick);
         console.debug(evaluator.getSequenceValue(game.moves));
         console.debug(localStorage.length);
     }
 
+    function robotThinksAndPlays() {
+        if (game.possibleNexts.length > 0) {
+            evaluator.evaluateNexts(game.clock.getTime() + 900);
+            setTimeout(robotPlays, 1000);
+        }
+    }
+
     function onClick(event) {
-        document.body.removeEventListener('click', onClick);
         const tmp = event.target.closest('svg > g > g.node');
         if (tmp && (game.possibleNexts === undefined || game.possibleNexts.includes(getNodeId(tmp)))) {
-            play(tmp);
-            if (game.possibleNexts.length > 0) {
-                evaluator.evaluateNexts(game.clock.getTime() + 900);
-                setTimeout(robotPlays, 1000);
+            document.body.removeEventListener('click', onClick);
+            playRound(tmp);
+        }
+    }
+
+    function playRound(svgNode) {
+        someonePlays(svgNode);
+        robotThinksAndPlays();
+    }
+
+    function onFirstClick(event) {
+        const svgNode = event.target.closest('svg > g > g.node');
+        if (svgNode) {
+            document.body.removeEventListener('click', onFirstClick);
+            removeRobotSvgNode();
+            if (svgNode.id === 'robot_begins') {
+                robotBegins();
+            } else {
+                playerBegins(svgNode);
             }
         }
     }
 
-    function onFirstClick(event) {
-        firstPlayer.name = 'player';
-        secondPlayer.name = 'robot';
-        document.querySelector('button#robot_begins').setAttribute('class', 'started');
-        evaluator.player = secondPlayer;
-        onClick(event);
+    function removeRobotSvgNode() {
+        document.querySelector('g.node#robot_begins').remove();
     }
 
-    document.body.addEventListener('click', onFirstClick);
+    function playerBegins(svgNode) {
+        firstPlayer.name = 'player';
+        secondPlayer.name = 'robot';
+        evaluator.player = secondPlayer;
+        playRound(svgNode);
+    }
 
-    document.querySelector('#robot_begins').onclick = (event) => {
+
+
+    function robotBegins() {
         firstPlayer.name = 'robot';
         secondPlayer.name = 'player';
-        document.querySelector('button#robot_begins').setAttribute('class', 'started');
         evaluator.player = firstPlayer;
-        document.body.removeEventListener('click', onFirstClick);
-        event.stopPropagation();
-        robotPlays();
+        robotThinksAndPlays();
     }
 });
 
