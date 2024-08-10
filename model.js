@@ -212,7 +212,8 @@ export class Game {
         this.dispatch("played", {move: this.getLastMove()});
         if (this.possibleNexts.length === 0) {
             // the game is over
-            this.evaluator.onGameOver(this.currentPlayer.name);
+            // this.evaluator is null in a 2 player game
+            this.evaluator?.onGameOver(this.currentPlayer.name);
             this.dispatch("game over", {winner: this.currentPlayer.name});
         }
         this.currentPlayer = this.currentPlayer.getOtherPlayer();
