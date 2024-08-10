@@ -79,6 +79,7 @@ const valueThreshold = Math.abs((firstPlayerValue - secondPlayerValue) / 4);
 class Player {
     constructor(value, bestValueFunction, attenuationFactor, argsBestFunction, straightenFunction) {
         this.name = '';
+        // firstPlayerValue or secondPlayerValue
         this.value = value;
         this.bestValueFunction = bestValueFunction;
         this.attenuationFactor = attenuationFactor;
@@ -143,18 +144,40 @@ function checkNotNan(n) {
 }
 
 export class Game {
-    constructor(nextss, initialNextss, clock, gameOverCallback) {
+    constructor(nextss, initialNextss, clock, eventDispatcher) {
         this.nextss = nextss;
         this.moves = [];
         this.possibleNexts = range(nextss.length);
         this.initialNextss = initialNextss;
         this.clock = clock;
-        this.gameOverCallback = gameOverCallback;
         this.currentPlayer = firstPlayer;
+        this.dispatcher = eventDispatcher;
+        this.evaluator;
+    }
+
+    cloneNextss() {
+        return [...this.nextss.map(_ => [..._])];
+    }
+
+    dispatch(type, detail) {
+        // this.dispatcher is null for game copies used by evaluators
+        this.dispatcher?.dispatchEvent(new CustomEvent(type, {detail: detail}));
+    }
+
+    addGameOverListener(listener) {
+        this.addListener('game over', listener);
+    }
+
+    addPlayedListener(listener) {
+        this.addListener('played', listener);
     }
     
+    addListener(eventType, listener) {
+        this.dispatcher.addEventListener(eventType, listener);
+    }
+
     copy() {
-        const result = new Game([...this.nextss.map(_ => [..._])], this.initialNextss, this.clock, null);
+        const result = new Game(this.cloneNextss(), this.initialNextss, this.clock, null);
         result.moves = [...this.moves];
         return result;
     }
@@ -167,22 +190,32 @@ export class Game {
         return this.moves[this.moves.length - 2];
     }
 
+    getPrepreviousMove() {
+        return this.moves[this.moves.length - 3];
+    }
+
     getCurrentPlayer() {
         return (this.moves.length % 2) * firstPlayer;
     }
 
-    play(current) {
-        this.moves.push(current);
-        this.currentPlayer = this.currentPlayer.getOtherPlayer();
-        this.possibleNexts = [...this.nextss[current]];
+    updateNextss(current) {
         this.nextss = this.nextss.map((nexts, iNexts) => {
             return nexts.filter(next => next != current);
         });
         this.nextss[current] = [];
+    }
+
+    play(current) {
+        this.moves.push(current);
+        this.possibleNexts = [...this.nextss[current]];
+        this.updateNextss(current);
+        this.dispatch("played", {move: this.getLastMove()});
         if (this.possibleNexts.length === 0) {
             // the game is over
-            this.gameOverCallback?.(players[this.moves.length % 2].name);
+            this.evaluator.onGameOver(this.currentPlayer.name);
+            this.dispatch("game over", {winner: this.currentPlayer.name});
         }
+        this.currentPlayer = this.currentPlayer.getOtherPlayer();
     }
 
     getLastMove() {
@@ -196,12 +229,14 @@ export class Game {
 
 
 export class Evaluator {
-    constructor(game, gameOverCallback, sequenceValueStorage, player) {
+    constructor(game, sequenceValueStorage, player) {
         this.game = game;
-        this.gameOverCallback = gameOverCallback;
-        this.sequenceValueStorage= sequenceValueStorage;
-        this.values = [];
+        this.game.evaluator = this;
+        this.sequenceValueStorage = sequenceValueStorage;
         this.player = player ?? secondPlayer;
+        if (this.game.dispatcher) {
+            this.game.addGameOverListener(evt => this.onGameOver(evt.winner));
+        }
     }
 
     /* The value of a sequence says if the sequence is winning for firstPlayer or secondPlayer.
@@ -272,7 +307,7 @@ export class Evaluator {
         if (!time || this.game.clock.getTime() < time) {
             for (let next of this.game.possibleNexts) {
                 const gameCopy = this.game.copy();
-                const evaluator = new Evaluator(gameCopy, null, this.sequenceValueStorage);
+                const evaluator = new Evaluator(gameCopy, this.sequenceValueStorage, this.player);
                 gameCopy.gameOverCallback = evaluator.onGameOver.bind(evaluator); 
                 gameCopy.play(next);
                 f(evaluator, time);
@@ -305,18 +340,6 @@ export class Evaluator {
     
     onGameOver(winner) {
         this.evaluateAllSubsequences();
-        this.gameOverCallback?.(winner);
-    }
-
-    pushValue() {
-        this.values.push(this.getSequenceValue(this.game.moves));
-        if (this.values.length > 1) {
-            const previous = this.values[this.values.length - 2];
-            const last = this.values[this.values.length - 1];
-            if (secondPlayer.isWinning(previous) && previous < last) {
-                console.warn(this.values);
-            }
-        }
     }
 
 }

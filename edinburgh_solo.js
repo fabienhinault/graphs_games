@@ -14,28 +14,68 @@ function getNodeId(svgNode) {
     return Number(svgNode.id.substring(2));
 }
 
-function updateSvgCurrentVertex(currentSvgNode) {
-    let ellipse = currentSvgNode.querySelector('ellipse');
-    ellipse.setAttribute('fill', 'gray');
-}
-
-function updateSvgPreviousVertex(previousSvgNode, game) {
-    document.querySelectorAll(`g._${getNodeId(previousSvgNode)}_`).forEach(g => {
-        if (g.getAttribute('class').includes(`_${game.getCurrentMove()}_`)) {
-            g.querySelector('path').setAttribute('stroke', 'lightgray');
-        } else if (game.moves.length < 3 || !g.getAttribute('class').includes(`_${game.moves[game.moves.length - 3]}_`)) {
-            g.remove();
-        }
-    });
-    const lastCircle = previousSvgNode.querySelector('ellipse');
-    lastCircle.setAttribute('stroke', 'lightgray');
-    lastCircle.setAttribute('fill', 'none');
-    if (game.moves.length === 2) {
-        lastCircle.setAttribute('stroke-width', '3');
+class View {
+    constructor(game) {
+        this.game = game;
+        this.onPlayedFn = this.onPlayed.bind(this);
+        this.onGameOverFn = this.onGameOver.bind(this);
+        this.game.addPlayedListener(this.onPlayedFn);
+        this.game.addGameOverListener(this.onGameOverFn);
+        this.currentSvgNode;
+        this.previousSvgNode;
+        document.querySelectorAll('body > img').forEach(img => img.setAttribute('class', 'playing'));
+        const graphElement = document.querySelector('#graph0');
+        const parentSvg = graphElement.closest('svg');
+        moveEdgesLast();
+        voronoize(parentSvg, graphElement);
     }
-    previousSvgNode.querySelector('text').setAttribute('style', 'fill: lightgray;');
-}
 
+    stopListening() {
+        this.game.dispatcher.removeEventListener("played", this.onPlayedFn);
+        this.game.dispatcher.removeEventListener("game over", this.onGameOverFn);
+    }
+
+    onGameOver(evt) {
+        const winnerName = evt.detail.winner;
+        const klass = `${winnerName}_won`;
+        ['#robot_won', '#player_won']
+            .map(idSelector => document.querySelector(idSelector))
+            .forEach(img => img.setAttribute('class', klass));
+    }
+
+    onPlayed(playedEvent) {
+        const currentNodeId = playedEvent.detail.move;
+        this.previousSvgNode = this.currentSvgNode;
+        this.currentSvgNode = document.querySelector(`g#id${currentNodeId}`);
+        this.updateSvgCurrentVertex();
+        if (this.previousSvgNode !== undefined) {
+            this.updateSvgPreviousVertex(currentNodeId);
+        }
+    }
+   
+    updateSvgCurrentVertex() {
+        this.currentSvgNode.querySelector('ellipse').setAttribute('fill', 'gray');
+    }
+
+    updateSvgPreviousVertex(currentNodeId) {
+        document.querySelectorAll(`g._${getNodeId(this.previousSvgNode)}_`).forEach(g => {
+            if (g.getAttribute('class').includes(`_${currentNodeId}_`)) {
+                g.querySelector('path').setAttribute('stroke', 'lightgray');
+            } else if (this.game.moves.length < 3 || !g.getAttribute('class').includes(`_${this.game.getPrepreviousMove()}_`)) {
+                // do not remove edge between previous and pre-previous
+                g.remove();
+            }
+        });
+        const lastCircle = this.previousSvgNode.querySelector('ellipse');
+        lastCircle.setAttribute('stroke', 'lightgray');
+        lastCircle.setAttribute('fill', 'none');
+        if (this.game.moves.length === 2) {
+            lastCircle.setAttribute('stroke-width', '3');
+        }
+        this.previousSvgNode.querySelector('text').setAttribute('style', 'fill: lightgray;');
+    }
+
+} 
 
 document.addEventListener('DOMContentLoaded', async function() {
     const path = new URL(window.location.toLocaleString()).searchParams.get('path');
@@ -43,55 +83,42 @@ document.addEventListener('DOMContentLoaded', async function() {
     const svgContent = await fetch(`${path}.svg`);
     const svgHtml = await svgContent.text();
     let game;
-    let current;
-    let previous;
     let evaluator;
+    let view;
     init();
 
-    function init() {
+    function init(evt) {
+        evt?.stopPropagation();
+        document.body.removeEventListener('click', init);
         const tmpSvg = document.querySelector('body > svg');
         tmpSvg.innerHTML = svgHtml;
         tmpSvg.replaceWith(...tmpSvg.childNodes);
-        game = new Game(nextss, JSON.parse(JSON.stringify(nextss)), new Clock(), null);
-        current = undefined;
-        previous = undefined;
-        evaluator = new Evaluator(game, onGameOver, new LocalStorageSequenceValueStorage(), null);
-        game.gameOverCallback = evaluator.onGameOver.bind(evaluator);
-        const graphElement = document.querySelector('#graph0');
-        const parentSvg = graphElement.closest('svg');
-        moveEdgesLast();
-        voronoize(parentSvg, graphElement);
-        document.body.removeEventListener('click', init);
+        game = new Game(nextss, JSON.parse(JSON.stringify(nextss)), new Clock(), document);
+        game.addGameOverListener(onGameOver);
+        if (view) {
+            // else, the old view continues listening
+            view.stopListening();
+        }
+        view = new View(game);
+        evaluator = new Evaluator(game, new LocalStorageSequenceValueStorage(), null);
         document.body.addEventListener('click', onFirstClick);
-        document.querySelectorAll('body > img').forEach(img => img.setAttribute('class', 'playing'));
     }
 
-    function onGameOver(winnerName) {
-        const klass = `${winnerName}_won`;
-        ['#robot_won', '#player_won']
-            .map(idSelector => document.querySelector(idSelector))
-            .forEach(img => img.setAttribute('class', klass));
+    function onGameOver(evt) {
         document.body.removeEventListener('click', onClick);
         document.body.addEventListener('click', init);
     }
 
     function someonePlays(svgNode) {
-        previous = current;
-        current = svgNode;
-        const idNumber = getNodeId(current);
+        const idNumber = getNodeId(svgNode);
         game.play(idNumber);
-        evaluator.pushValue();
-        updateSvgCurrentVertex(current);
-        if (previous !== undefined) {
-            updateSvgPreviousVertex(previous, game);
-        }
     }
 
     function robotPlays() {
         const botNodeId = evaluator.chooseNext();
         const botSvgNode = document.querySelector(`g#id${botNodeId}`);
-        someonePlays(botSvgNode);
         document.body.addEventListener('click', onClick);
+        someonePlays(botSvgNode);
         console.debug(evaluator.getSequenceValue(game.moves));
         console.debug(localStorage.length);
     }
