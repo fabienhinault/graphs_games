@@ -6,6 +6,7 @@
 (require racket/trace)
 (require json)
 (require net/base64)
+(require file/md5)
 
 (define (rec-couples l)
     (if (null? l)
