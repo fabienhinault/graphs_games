@@ -739,9 +739,32 @@ node [shape=circle style=filled fillcolor=gray99]
           (24 25) (24 26) (3 21) (24 20) (25 27) (26 27) (28 29) (9 15) (25 13) (27 13) (28 17)
           (29 13) (29 15) (29 17) (9 21) (11 21) (11 22) (25 22) (26 21) (26 22) (28 20) (28 21)
           (15 17) (17 19) (19 20) (19 22)))
- 
- "ehAIAEAAIAgYAAAAgAIAhAAAAAYAAjAAOIAJEFgABYCCoAAAAAIAAQCgAADQICADAABMAABUAI")                          
-  
+ "ehAIAEAAIAgYAAAAgAIAhAAAAAYAAjAAOIAJEFgABYCCoAAAAAIAAQCgAADQICADAABMAABUAI")
+(check-equal?
+ (string-length (graph->g64
+  30
+  '((0 1) (2 3) (4 5) (6 7) (6 11) (8 9) (10 9) (12 13) (14 13) (14 15) (16 17) (18 15) (0 20) (1 19)
+          (2 19) (4 20) (8 22) (10 22) (12 21) (16 20) (18 19) (3 23) (5 23) (7 23) (5 27) (7 11)
+          (24 25) (24 26) (3 21) (24 20) (25 27) (26 27) (28 29) (9 15) (25 13) (27 13) (28 17)
+          (29 13) (29 15) (29 17) (9 21) (11 21) (11 22) (25 22) (26 21) (26 22) (28 20) (28 21)
+          (15 17) (17 19) (19 20) (19 22))))
+ 74)
+
+(define (graph->md5-64 g)
+  (foldl
+   (λ (e acc) (string-replace acc (car e) (cdr e)))
+   (bytes->string/utf-8 (base64-encode (md5 (~a g) #f)))
+   (list (cons "+" "-") (cons "/" "_") (cons "=" "") (cons "\r" "") (cons "\n" ""))))
+
+(check-equal?
+ (graph->md5-64
+  '((0 1) (2 3) (4 5) (6 7) (6 11) (8 9) (10 9) (12 13) (14 13) (14 15) (16 17) (18 15) (0 20) (1 19)
+          (2 19) (4 20) (8 22) (10 22) (12 21) (16 20) (18 19) (3 23) (5 23) (7 23) (5 27) (7 11)
+          (24 25) (24 26) (3 21) (24 20) (25 27) (26 27) (28 29) (9 15) (25 13) (27 13) (28 17)
+          (29 13) (29 15) (29 17) (9 21) (11 21) (11 22) (25 22) (26 21) (26 22) (28 20) (28 21)
+          (15 17) (17 19) (19 20) (19 22)))
+ "fuD_Gbyj9B60EZoT5uQRBQ")
+
 (define (make-directory-and-parents dir)
   (when (not (directory-exists? dir))
     (make-directory-and-parents (simplify-path (build-path dir 'up)))
