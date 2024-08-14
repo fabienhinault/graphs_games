@@ -471,9 +471,9 @@
   acc-vector-nextss)
 
 (define (get-graph-nextss graph nb-vertices)
-  (deep ~a (vector->list (foldl add-edge-to-graph-vector (make-vector nb-vertices '()) graph))))
+  (vector->list (foldl add-edge-to-graph-vector (make-vector nb-vertices '()) graph)))
 
-(check-equal? (get-graph-nextss '((0 2) (1 2)) 3) '(("2") ("2") ("1" "0")))
+(check-equal? (get-graph-nextss '((0 2) (1 2)) 3) '((2) (2) (1 0)))
 
          
 ; node-renamings: a hash map linking old vertices names to new ones
@@ -650,9 +650,10 @@
 (define (graph-dot g vertices)
   (string-append*
    "strict graph {
-node [shape=circle style=filled fillcolor=gray99]
+node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 "
-   (append (map vertex-dot vertices)
+   (append (list "🤖 [id=\"robot_begins\" fontsize=23]\n")
+           (map vertex-dot vertices)
            (map edge-dot g)
            (list "}
 "))))
@@ -668,10 +669,10 @@ node [shape=circle style=filled fillcolor=gray99]
         ((equal? n 62) #\-)
         ((equal? n 63) #\_)))
 
-(define (graph-name g)
+(define (graph-long-name g)
   (list->string (map number->base64 (flatten g))))
 
-(check-equal? (graph-name '((0 1) (0 2))) "ABAC")
+(check-equal? (graph-long-name '((0 1) (0 2))) "ABAC")
 
 (define (bits-reorder g)
   (sort
@@ -772,12 +773,16 @@ node [shape=circle style=filled fillcolor=gray99]
     (make-directory dir)))
 
 (define (write-dot-file g dir vertices)
-  (when (not (directory-exists? dir))
-      (make-directory-and-parents dir))
-  (with-output-to-file (~a dir "/" (graph-name g) ".dot")
+  (define md5 (graph->md5-64 g))
+  (define graph-dir (~a dir "/" md5))
+  (when (not (directory-exists? graph-dir))
+      (make-directory-and-parents graph-dir))
+  (with-output-to-file (~a graph-dir "/_.dot")
     (λ() (printf (graph-dot g vertices))))
-  (with-output-to-file (~a dir "/" (graph-name g) ".json")
-    (λ() (write-json (get-graph-nextss g (length vertices))))))
+  (with-output-to-file (~a graph-dir "/_.js")
+    (λ() (display "export const nextss = ")
+      (write-json (get-graph-nextss g (length vertices)))))
+  graph-dir)
 
 (define (random-edge l)
   (let* ((v1 (random-ref l)))
@@ -896,24 +901,21 @@ node [shape=circle style=filled fillcolor=gray99]
 
 (define (create-random-edinburgh-graph vertices nb-edges)
   (remove-duplicates
-   (rewrite-graph
-    (make-all-vertices-degree2
-     (rec-rename-graph-vertices
-      (rewrite-graph 
-       (rec-connect-graph
-        (make-all-vertices-degree2
-         (add-absent-vertices (random-graph vertices nb-edges) vertices)
-         vertices)
-        (list->set vertices)))
-      (make-hash) (new-name-numeric-generator))))))
+   (rec-rename-graph-vertices
+    (rewrite-graph 
+     (rec-connect-graph
+      (make-all-vertices-degree2
+       (add-absent-vertices (random-graph vertices nb-edges) vertices)
+       vertices)
+      (list->set vertices)))
+    (make-hash) (new-name-numeric-generator))))
 
 (define (write-random-edinburgh-dot nb-vertices nb-edges)
   (let* ((vertices (range nb-vertices))
          (graph (create-random-edinburgh-graph vertices nb-edges))
          (final-nb-edges (length graph))
          (path (~a nb-vertices "/" final-nb-edges)))
-    (write-dot-file graph path vertices)
-    path))
+    (write-dot-file graph path vertices)))
 
 ;(for-each
 ;   (lambda (_) (write-dot-file _ 6))
