@@ -270,12 +270,18 @@
                                       (equal? s (graph-second-node g)))))
                        l)))))
 
-(define (add-absent-vertices g l)
-  (let ((? (contains-all? g l)))
-    (if (equal? ? #t)
+(define (add-absent-vertices g vertices)
+  (let ((missing-vertices (contains-all? g vertices)))
+    (if (equal? missing-vertices #t)
         g
-        (append g (map (λ (_) (list _ (random-ref l))) ?)))))
-         
+        (let* ((result (append g
+                               (map (λ (vertex) (random-edge-from vertices vertex))
+                                    missing-vertices)))
+               (missing-from-result (contains-all? result vertices)))
+          (when (not (equal? missing-from-result #t)) (raise (list g '() '() result)))
+          result))))
+
+
 
 (define (tailrec-graph->node-set graph nodes-set)
   (if (null? graph)
@@ -596,6 +602,10 @@
           (symbol-compare (car e1) (car e2))
           (symbol-compare (cadr e1) (cadr e2))))))))
 
+(define (get-graph-degree-1-vertices graph vertices)
+  (filter (λ (_) (equal? 1 (get-degree _ graph)))
+          vertices))
+
 (define (rewrite-graph graph)
   (define degrees (make-hash))
   (deep (λ (_) (hash-set! degrees _ (get-degree _ graph))) graph)
@@ -636,6 +646,17 @@
 (check-equal?
  (rewrite-graph '((0 1) (2 3) (1 3) (0 4) (2 4) (3 4)))
  '((0 1) (0 4) (1 3) (2 3) (2 4) (3 4)))
+
+(check-equal?
+ '()
+ (get-graph-degree-1-vertices
+  (rewrite-graph
+   '((29 7) (17 9) (5 6) (4 15) (5 10) (19 29) (20 8) (17 5) (2 22) (24 18) (25 4) (17 13) (2 26)
+            (9 10) (27 24) (23 10) (15 29) (12 6) (22 9) (15 18) (22 11) (2 21) (20 11) (29 12)
+            (21 7) (2 8) (5 18) (15 20) (27 4) (7 2) (1 17) (16 8) (20 21) (8 22) (28 26) (18 17)
+            (25 28) (2 18) (20 1) (5 20) (2 20) (3 23) (26 15) (24 19) (4 2) (18 15) (6 10) (21 22)
+            (12 22) (0 21) (14 24) (0 26) (3 0) (13 14) (14 21) (16 29)))
+  (range 30)))
 
 (define (vertex-dot v)
     (~a v " [id=\"id" v "\"]" #\newline))
@@ -784,9 +805,11 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
       (write-json (get-graph-nextss g (length vertices)))))
   graph-dir)
 
-(define (random-edge l)
-  (let* ((v1 (random-ref l)))
-    (list v1 (random-ref (remove v1 l)))))
+(define (random-edge-from vertices vertex)
+  (list vertex (random-ref (remove vertex vertices))))
+
+(define (random-edge vertices)
+  (random-edge-from vertices (random-ref vertices)))
 
 (define (random-graph l nb-edges)
   (remove-duplicates (build-list nb-edges (λ (_) (random-edge l)))))
@@ -890,25 +913,45 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
          (pick-random-vertex graph vertex))
    graph))
 
-(define (get-graph-degree-1-vertices graph vertices)
-  (filter (λ (_) (equal? 1 (get-degree _ graph)))
-          vertices))
 
 (define (make-all-vertices-degree2 graph vertices)
-  (append graph
-          (map (λ (_) (list _ (random-ref (remove _ vertices))))
-               (get-graph-degree-1-vertices graph vertices))))
+  (define result (append graph
+                         (map (λ (vertex) (random-edge-from vertices vertex))
+                              (get-graph-degree-1-vertices graph vertices))))
+  (when (not (null? (get-graph-degree-1-vertices result vertices)))
+    (raise (list graph '() '() result)))
+  result)
+
+(check-equal?
+ '()
+ (get-graph-degree-1-vertices
+  (make-all-vertices-degree2
+   '((3 26) (7 16) (20 8) (28 20) (7 22) (6 3) (28 1) (22 12) (27 11) (21 2) (15 6) (2 19) (26 14)
+            (1 26) (0 5) (10 4) (16 12) (18 17) (1 11) (8 5) (5 9) (21 7) (12 21) (15 18) (22 1)
+            (0 11) (27 8) (26 29) (5 15) (19 18) (10 16) (9 5) (9 1) (10 17) (18 21) (3 1) (16 7)
+            (10 0) (29 4) (20 26) (1 29) (13 28) (19 2) (17 7) (8 17) (13 16) (24 3) (26 22) (23 20)
+            (25 2))
+   (range 30))
+  (range 30)))
+
 
 (define (create-random-edinburgh-graph vertices nb-edges)
-  (remove-duplicates
-   (rec-rename-graph-vertices
-    (rewrite-graph 
-     (rec-connect-graph
-      (make-all-vertices-degree2
-       (add-absent-vertices (random-graph vertices nb-edges) vertices)
-       vertices)
-      (list->set vertices)))
-    (make-hash) (new-name-numeric-generator))))
+  (define first (random-graph vertices nb-edges))
+  (displayln first)
+  (define all-vertices (add-absent-vertices first vertices))
+  (displayln all-vertices)
+  (define deduplicated (remove-duplicates all-vertices))
+  (displayln deduplicated)
+  (define connected (rec-connect-graph deduplicated (list->set vertices)))
+  (displayln connected)
+  (define deg2 (make-all-vertices-degree2 connected vertices))
+  (displayln deg2)
+  (define rewritten (rewrite-graph deg2))
+  (displayln rewritten)
+  (define renamed (rec-rename-graph-vertices rewritten (make-hash) (new-name-numeric-generator)))
+  (displayln renamed)
+  renamed)
+
 
 (define (write-random-edinburgh-dot nb-vertices nb-edges)
   (let* ((vertices (range nb-vertices))
