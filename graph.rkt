@@ -1244,7 +1244,7 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 ;'((0 3) (0 4) (1 2) (1 3) (2 4) (3 4)) should not be returned,
 ; as similar to '((0 1) (0 3) (1 4) (2 3) (2 4) (3 4)).
 ; There should not be a degree 2 vertex edging to another degree 2 vertex
-; after another degree 2 vertex edging to only degree 3 vertices.
+; after another degree 2 vertex in same category edging to only degree 3 vertices.
 ;
 ; 0   2   0   1
 ; |\ /|   |\ /|
@@ -1256,3 +1256,64 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
               '(((0 1) (0 3) (1 4) (2 3) (2 4) (3 4))
                 ((0 3) (0 4) (1 3) (1 4) (2 3) (2 4))))
 
+; 0--1--3--4--2
+; `-----------'
+(check-equal? (degrees->graphs '(2 2 2 2 2) 0 '((0 1 2 3 4)) '((0 1 2 3 4)))
+              '(((0 1) (0 2) (1 3) (2 4) (3 4))))
+
+; 0   2
+; |\ /|
+; | 4 |
+; |/ \|
+; 1   3
+(check-equal? (degrees->graphs '(2 2 2 2 4) 0 '((0 1 2 3) (4)) '((0 1 2 3) (4)))
+              '(((0 1) (0 4) (1 4) (2 3) (2 4) (3 4))))
+
+
+; 0--3--2
+;  \/| /
+;  /\|/
+; 1--4
+(check-equal? (degrees->graphs '(2 2 2 4 4) 0 '((0 1 2) (3 4)) '((0 1 2) (3 4)))
+              '(((0 3) (0 4) (1 3) (1 4) (2 3) (2 4) (3 4))))
+
+
+; 0--2---3--1
+; |   \ /   |
+; `----4----'
+(check-equal? (degrees->graphs '(2 2 3 3 4) 0 '((0 1) (2 3) (4)) '((0 1) (2 3) (4)))
+              '(((0 2) (0 4) (1 3) (1 4) (2 3) (2 4) (3 4))))
+
+; 0
+; |\
+; 1 2---3
+; |  \ /
+; `---4
+(check-equal? (degrees->graphs '(2 3 3 3 3) 0 '((0) (1 2 3 4)) '((0) (1 2 3 4)))
+              '(((0 1) (0 2) (1 3) (1 4) (2 3) (2 4) (3 4))))
+
+(check-equal? (degrees->graphs  '(2 2 4 4 4) 0 '((0 1) (2 3 4)) '((0 1) (2 3 4)))
+              '())
+
+;     0
+;    / \
+;   3---4
+;   |\ /|
+;   | X |
+;   |/ \|
+;   1---2
+(check-equal? (degrees->graphs '(2 3 3 4 4) 0 '((0) (1 2) (3 4)) '((0) (1 2) (3 4)))
+              '(((0 3) (0 4) (1 2) (1 3) (1 4) (2 3) (2 4) (3 4))))
+
+; ,---------.
+; 0--2---3--1
+; |   \ /   |
+; `----4----'
+(check-equal? (degrees->graphs '(3 3 3 3 4) 0 '((0 1 2 3) (4)) '((0 1 2 3) (4)))
+              '(((0 1) (0 2) (0 4) (1 3) (1 4) (2 3) (2 4) (3 4))))
+
+(check-equal? (degrees->graphs '(2 4 4 4 4) 0 '((0) (1 2 3 4)) '((0) (1 2 3 4)))
+              '())
+
+
+ 
