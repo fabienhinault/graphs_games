@@ -1052,10 +1052,14 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 (define (not-null? l)
   (not (null? l)))
 
+;return the category list minus vertices of the last edge in edges
 (define (remove-categories-before-last-joined categories edges)
-  (memf (λ (categorie) (member (cadr (last edges)) categorie))
-        categories))
+  (if (null? edges)
+      categories
+      (memf (λ (categorie) (member (cadr (last edges)) categorie))
+            categories)))
 
+(check-equal? (remove-categories-before-last-joined '((4)) '()) '((4)))
 
 ; split categories if some vertices are touched by edges
 (define (get-new-new-categories new-categories edges)
@@ -1110,7 +1114,7 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
                   edgess)))))
 
 
-
+(check-equal? (degrees->graphs '(0 2) 3 '((4))) '())
 (check-equal? (degrees->graphs '(0) 1 '((1))) '(()))
 
 (check-equal? (get-new-new-categories '((1)) '((0 1))) '((1)))
@@ -1193,8 +1197,14 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 (check-equal? (rec-parts-w/nb-categories  '(([1 2]) ([1 3]) ([1 4])) 1) '(([1 2]) ([1 3]) ([1 4])))
 (check-equal? (get-edge-categories 1  '((2) (3) (4)))  '(([1 2]) ([1 3]) ([1 4])))
 (check-equal? (filter-out-vertex-from-categories 1 '((1) (2) (3) (4))) '((2) (3) (4)))
-; contract violation
-;(check-equal? (degrees->graphs '(1 2 2 3) 1 '((1) (2) (3) (4))) '({(1 4) (2 3) (2 4) (3 4)}))
+
+
+
+(check-equal? (degrees->graphs '(2 2 2) 2 '((4))) '({(2 3) (2 4) (3 4)}))
+
+(check-equal? (degrees->graphs '(1 2 2 3) 1 '((1) (2) (3) (4))) '({(1 4) (2 3) (2 4) (3 4)}))
+
+(check-equal? (degrees->graphs '(1 2 2 3) 1 '((1) (2 3) (4))) '({(1 4) (2 3) (2 4) (3 4)}))
 
 ;(check-equal? (get-new-new-categories '((1 2) (3 4)) '([0 1] [0 3])) '((1) (2) (3) (4)))
 ;(check-equal? (get-new-degrees '([0 1] [0 3]) '(2 2 3 3) 0) '(1 2 2 3))
