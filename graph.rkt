@@ -159,6 +159,22 @@
 (check-equal? (rec-parts-w/nb-categories '(([0 1]) ([0 2] [0 3])) 2) '(([0 1] [0 2]) ([0 2] [0 3])))
 (check-equal? (rec-parts-w/nb-categories '(([1 2]) ([1 3])) 1) '(([1 2]) ([1 3])))
 
+
+; partitions of (apply append categories) having nb elements,
+; always taking the first elements in each category
+(define (rec-parts-w/nb-categories-stream categories nb)
+    (cond ((null? categories)
+           empty-stream)
+          ((equal? 0 nb)
+           (stream '()))
+          ((null? (car categories))
+           (rec-parts-w/nb-categories-stream (cdr categories) nb))
+          (else (stream-append
+                 (stream-map (λ (_) (cons (caar categories) _))
+                      (rec-parts-w/nb-categories-stream (cons (cdar categories) (cdr categories)) (- nb 1)))
+                 (rec-parts-w/nb-categories-stream (cdr categories) nb)))))
+
+
 (define (tailrec-parts-update-result tmp-res x)
     (append
      tmp-res
@@ -1109,7 +1125,12 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
              (append edges sub-graph))
            sub-graphs)))
 
-; in degrees list of vertices' degrees
+; in: degrees list of vertices' degrees.
+; in: all-categories gathering of vertices. First, a category correspond to vertices of same degree.
+; during the recursion, categories can be splitted. The first vertex will only edge to the first
+; vertices of any category.
+; in: first-vertex-categories subset of all-categories to which first-vertex is allowed to edge,
+; depending on how the previous vertex has edged.
 ; return: list of graphs matching these degrees
 (define (degrees->graphs degrees first-vertex all-categories first-vertex-categories)
   (define length-degrees (length degrees))
@@ -1135,9 +1156,68 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
                                          new-v1-categories first-second-same-category))
                   edgess)))))
 
+;;;;;;;;;;;;;;;;
+; stream version
+
+(define (get-edges-subgraphs-stream edges degrees first-vertex new-all-categories
+                                    new-v1-categories first-second-same-category)
+  (define new-degrees (get-new-degrees edges (cdr degrees) first-vertex))
+  (define new-new-all-categories (get-new-new-categories new-all-categories edges))
+  (define new-new-v1-categories 
+    (if first-second-same-category
+        (get-new-new-categories
+         (remove-categories-before-first-joined new-v1-categories edges)
+         edges)
+        new-new-all-categories))
+  (define sub-graphs-stream (degrees->graphs-stream new-degrees
+                                                    (+ 1 first-vertex)
+                                                    new-new-all-categories
+                                                    new-new-v1-categories))
+  (if (stream-empty? sub-graphs-stream)
+      empty-stream
+      (stream-map (λ (sub-graph) (append edges sub-graph))
+                  sub-graphs-stream)))
+
+; in: degrees list of vertices' degrees.
+; in: all-categories gathering of vertices. First, a category correspond to vertices of same degree.
+; during the recursion, categories can be splitted. The first vertex will only edge to the first
+; vertices of any category.
+; in: first-vertex-categories subset of all-categories to which first-vertex is allowed to edge,
+; depending on how the previous vertex has edged.
+; return: list of graphs matching these degrees
+(define (degrees->graphs-stream degrees first-vertex all-categories first-vertex-categories)
+  (define length-degrees (length degrees))
+  (cond ((equal? degrees '())
+         empty-stream)
+        ((null? (car all-categories))
+         (degrees->graphs-stream degrees first-vertex (cdr all-categories) first-vertex-categories))
+        ((null? (car first-vertex-categories))
+         (degrees->graphs-stream degrees first-vertex all-categories (cdr first-vertex-categories)))
+        ((equal? degrees '(0))
+          (stream '())) ; the empty graph
+        ((memf (λ (deg) (>= deg length-degrees)) degrees)
+         empty-stream)
+        (else (let* ((first-second-same-category (member (+ 1 first-vertex) (car all-categories)))
+                     ;remove current vertex from categories
+                     (new-all-categories (filter-out-vertex-from-categories first-vertex all-categories))
+                     (new-v1-categories (filter-out-vertex-from-categories first-vertex first-vertex-categories))
+                     (edge-categories (get-edge-categories first-vertex new-v1-categories))
+                     (edgess (rec-parts-w/nb-categories-stream edge-categories (car degrees))))
+                (stream-fold
+                  (λ (acc edges)
+                    (stream-append
+                     acc
+                     (get-edges-subgraphs-stream edges degrees first-vertex new-all-categories
+                                                new-v1-categories first-second-same-category)))
+                  empty-stream
+                  edgess)))))
 
 (check-equal? (degrees->graphs '(0 2) 3 '((4)) '((4))) '())
+(check-equal? (stream->list (degrees->graphs-stream  '(0 2) 3 '((4)) '((4))))
+              (degrees->graphs '(0 2) 3 '((4)) '((4))))
 (check-equal? (degrees->graphs '(0) 1 '((1)) '((1))) '(()))
+(check-equal? (stream->list (degrees->graphs-stream  '(0) 1 '((1)) '((1))))
+              (degrees->graphs '(0) 1 '((1)) '((1))))
 
 (check-equal? (get-new-new-categories '((1)) '((0 1))) '((1)))
 (check-equal? (get-new-degrees '((0 1)) '(1) 0) '(0))
@@ -1145,8 +1225,12 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 (check-equal? (get-edge-categories 0 '((1))) '(((0 1))))
 (check-equal? (filter-out-vertex-from-categories 0 '((0 1))) '((1)))
 (check-equal? (degrees->graphs '(1 1) 0 '((0 1)) '((0 1))) '(((0 1)))) ; 0--1
+(check-equal? (stream->list (degrees->graphs-stream  '(0) 1 '((1)) '((1))))
+              (degrees->graphs '(0) 1 '((1)) '((1))))
 
 (check-equal? (degrees->graphs '(0) 3 '((3)) '((3))) '(()))
+(check-equal? (stream->list (degrees->graphs-stream  '(0) 3 '((3)) '((3))))
+              (degrees->graphs '(0) 3 '((3)) '((3))))
 
 (check-equal? (get-new-new-categories '((3)) '((2 3))) '((3)))
 (check-equal? (get-new-degrees '((2 3)) '(1) 2) '(0))
@@ -1154,6 +1238,8 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 (check-equal? (get-edge-categories 2 '((3))) '(((2 3))))
 (check-equal? (filter-out-vertex-from-categories 2 '((2 3))) '((3)))
 (check-equal? (degrees->graphs '(1 1) 2 '((2 3)) '((2 3))) '(((2 3))))
+(check-equal? (stream->list (degrees->graphs-stream  '(1 1) 2 '((2 3)) '((2 3))))
+              (degrees->graphs '(1 1) 2 '((2 3)) '((2 3))))
 
 (check-equal? (get-new-new-categories '((2 3)) '((1 2) (1 3))) '((2 3)))
 (check-equal? (get-new-degrees '((1 2) (1 3)) '(2 2) 1) '(1 1))
@@ -1161,6 +1247,8 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 (check-equal? (get-edge-categories 1 '((2 3))) '(((1 2) (1 3))))
 (check-equal? (filter-out-vertex-from-categories 1 '((1) (2 3))) '((2 3)))
 (check-equal? (degrees->graphs '(2 2 2) 1 '((1) (2 3)) '((1) (2 3))) '(((1 2) (1 3) (2 3))))
+(check-equal? (stream->list (degrees->graphs-stream  '(2 2 2) 1 '((1) (2 3)) '((1) (2 3))))
+              (degrees->graphs '(2 2 2) 1 '((1) (2 3)) '((1) (2 3))))
 
 (check-equal? (get-new-new-categories '((1) (2 3)) '((0 2) (0 3))) '((1) (2 3)))
 (check-equal? (get-new-degrees '((0 2) (0 3)) '(2 3 3) 0) '(2 2 2))
@@ -1169,6 +1257,8 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 (check-equal? (get-edge-categories 3 '()) '())
 (check-equal? (filter-out-vertex-from-categories 3 '((3))) '())
 (check-equal? (degrees->graphs '(2) 3 '((3)) '((3))) '())
+(check-equal? (stream->list (degrees->graphs-stream  '(2) 3 '((3)) '((3))))
+              (degrees->graphs '(2) 3 '((3)) '((3))))
 
 (check-equal? (get-new-new-categories '((3)) '((2 3))) '((3)))
 (check-equal? (get-new-degrees '((2 3)) '(3) 2) '(2))
@@ -1176,6 +1266,8 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 (check-equal? (get-edge-categories 2 '((3))) '(((2 3))))
 (check-equal? (filter-out-vertex-from-categories 2 '((2) (3))) '((3)))
 (check-equal? (degrees->graphs '(1 3) 2 '((2) (3)) '((2) (3))) '())
+(check-equal? (stream->list (degrees->graphs-stream  '(1 3) 2 '((2) (3)) '((2) (3))))
+              (degrees->graphs '(1 3) 2 '((2) (3)) '((2) (3))))
 
 (check-equal? (get-new-new-categories '((2) (3)) '((1 2))) '((2) (3)))
 (check-equal? (get-new-degrees '((1 2)) '(2 3) 1) '(1 3))
@@ -1183,6 +1275,8 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 (check-equal? (get-edge-categories 1 '((2) (3))) '(((1 2)) ((1 3))))
 (check-equal? (filter-out-vertex-from-categories 1 '((1) (2) (3))) '((2) (3)))
 (check-equal? (degrees->graphs '(1 2 3) 1 '((1) (2) (3)) '((1) (2) (3))) '())
+(check-equal? (stream->list (degrees->graphs-stream   '(1 2 3) 1 '((1) (2) (3)) '((1) (2) (3))))
+              (degrees->graphs  '(1 2 3) 1 '((1) (2) (3)) '((1) (2) (3))))
 
 (check-equal? (get-new-new-categories '((1) (2 3)) '((0 1) (0 2))) '((1) (2) (3)))
 (check-equal? (get-new-degrees '((0 1) (0 2)) '(2 3 3) 0) '(1 2 3))
@@ -1190,9 +1284,13 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 (check-equal? (get-edge-categories 0 '((1) (2 3))) '(((0 1)) ((0 2) (0 3))))
 (check-equal? (filter-out-vertex-from-categories 0 '((0 1) (2 3))) '((1) (2 3)))
 (check-equal? (degrees->graphs '(2 2 3 3) 0 '((0 1) (2 3)) '((0 1) (2 3))) '(((0 2) (0 3) (1 2) (1 3) (2 3))))
+(check-equal? (stream->list (degrees->graphs-stream  '(2 2 3 3) 0 '((0 1) (2 3)) '((0 1) (2 3))))
+              (degrees->graphs '(2 2 3 3) 0 '((0 1) (2 3)) '((0 1) (2 3))))
 
 
 (check-equal? (degrees->graphs '(1) 4 '((4)) '((4))) '())
+(check-equal? (stream->list (degrees->graphs-stream  '(1) 4 '((4)) '((4))))
+              (degrees->graphs '(1) 4 '((4)) '((4))))
 (check-equal? (get-new-new-categories '((4)) '([3 4])) '((4)))
 (check-equal? (remove-categories-before-first-joined '((4)) '([3 4])) '((4)))
 (check-equal? (get-new-degrees '([3 4]) '(2) 3) '(1))
@@ -1200,6 +1298,8 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 (check-equal? (get-edge-categories 3 '((4))) '(([3 4])))
 (check-equal? (filter-out-vertex-from-categories 3 '((4))) '((4)))
 (check-equal? (degrees->graphs '(0 2) 3 '((4)) '((4))) '())
+(check-equal? (stream->list (degrees->graphs-stream '(0 2) 3 '((4)) '((4))))
+              (degrees->graphs '(0 2) 3 '((4)) '((4))))
 (check-equal? (get-new-new-categories '((4)) '([2 3] [2 4])) '((4)))
 (check-equal? (remove-categories-before-first-joined '((3) (4)) '([2 3] [2 4])) '((3) (4)))
 (check-equal? (get-new-degrees '([2 3] [2 4]) '(1 3) 2) '(0 2))
@@ -1207,11 +1307,15 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 (check-equal? (get-edge-categories 2 '((3) (4))) '(([2 3]) ([2 4])))
 (check-equal? (filter-out-vertex-from-categories 2 '((2) (3) (4))) '((3) (4)))
 (check-equal? (degrees->graphs '(2 1 3) 2 '((2) (3) (4)) '((2) (3) (4))) '())
+(check-equal? (stream->list (degrees->graphs-stream '(2 1 3) 2 '((2) (3) (4)) '((2) (3) (4))))
+              (degrees->graphs '(2 1 3) 2 '((2) (3) (4)) '((2) (3) (4))))
 (check-equal? (get-new-new-categories '((3) (4)) '([1 3])) '((3) (4)))
 (check-equal? (remove-categories-before-first-joined '((2) (3) (4)) '([1 3])) '((3) (4)))
 (check-equal? (get-new-degrees '([1 3]) '(2 2 3) 1) '(2 1 3))
               
 (check-equal? (degrees->graphs '(1 2 3) 2 '((2) (3) (4)) '((2) (3) (4))) '())
+(check-equal? (stream->list (degrees->graphs-stream '(1 2 3) 2 '((2) (3) (4)) '((2) (3) (4))))
+              (degrees->graphs '(1 2 3) 2 '((2) (3) (4)) '((2) (3) (4))))
 (check-equal? (get-new-new-categories '((2) (3) (4)) '([1 2])) '((2) (3) (4)))
 (check-equal? (remove-categories-before-first-joined '((2) (3) (4)) '([1 2])) '((2) (3) (4)))
 (check-equal? (get-new-degrees '([1 2]) '(2 2 3) 1) '(1 2 3))
@@ -1220,13 +1324,17 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 (check-equal? (get-edge-categories 1  '((2) (3) (4)))  '(([1 2]) ([1 3]) ([1 4])))
 (check-equal? (filter-out-vertex-from-categories 1 '((1) (2) (3) (4))) '((2) (3) (4)))
 
-
-
 (check-equal? (degrees->graphs '(2 2 2) 2 '((2 3) (4)) '((4))) '())
+(check-equal? (stream->list (degrees->graphs-stream '(2 2 2) 2 '((2 3) (4)) '((4))))
+              (degrees->graphs '(2 2 2) 2 '((2 3) (4)) '((4))))
 
 (check-equal? (degrees->graphs '(1 2 2 3) 1 '((1) (2) (3) (4)) '((1) (2) (3) (4))) '({(1 4) (2 3) (2 4) (3 4)}))
+(check-equal? (stream->list (degrees->graphs-stream '(1 2 2 3) 1 '((1) (2) (3) (4)) '((1) (2) (3) (4))))
+              (degrees->graphs '(1 2 2 3) 1 '((1) (2) (3) (4)) '((1) (2) (3) (4))))
 
 (check-equal? (degrees->graphs '(1 2 2 3) 1 '((1) (2 3) (4)) '((1) (2 3) (4))) '({(1 4) (2 3) (2 4) (3 4)}))
+(check-equal? (stream->list (degrees->graphs-stream '(1 2 2 3) 1 '((1) (2 3) (4)) '((1) (2 3) (4))))
+              (degrees->graphs '(1 2 2 3) 1 '((1) (2 3) (4)) '((1) (2 3) (4))))
 
 (check-equal? (get-new-new-categories '((1 2) (3 4)) '([0 1] [0 3])) '((1) (2) (3) (4)))
 (check-equal? (get-new-degrees '([0 1] [0 3]) '(2 2 3 3) 0) '(1 2 2 3))
@@ -1255,11 +1363,15 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 (check-equal? (degrees->graphs '(2 2 2 3 3) 0 '((0 1 2) (3 4)) '((0 1 2) (3 4)))
               '(((0 1) (0 3) (1 4) (2 3) (2 4) (3 4))
                 ((0 3) (0 4) (1 3) (1 4) (2 3) (2 4))))
+(check-equal? (stream->list (degrees->graphs-stream '(2 2 2 3 3) 0 '((0 1 2) (3 4)) '((0 1 2) (3 4))))
+              (degrees->graphs '(2 2 2 3 3) 0 '((0 1 2) (3 4)) '((0 1 2) (3 4))))
 
 ; 0--1--3--4--2
 ; `-----------'
 (check-equal? (degrees->graphs '(2 2 2 2 2) 0 '((0 1 2 3 4)) '((0 1 2 3 4)))
               '(((0 1) (0 2) (1 3) (2 4) (3 4))))
+(check-equal? (stream->list (degrees->graphs-stream '(2 2 2 2 2) 0 '((0 1 2 3 4)) '((0 1 2 3 4))))
+              (degrees->graphs '(2 2 2 2 2) 0 '((0 1 2 3 4)) '((0 1 2 3 4))))
 
 ; 0   2
 ; |\ /|
@@ -1268,6 +1380,8 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 ; 1   3
 (check-equal? (degrees->graphs '(2 2 2 2 4) 0 '((0 1 2 3) (4)) '((0 1 2 3) (4)))
               '(((0 1) (0 4) (1 4) (2 3) (2 4) (3 4))))
+(check-equal? (stream->list (degrees->graphs-stream '(2 2 2 2 4) 0 '((0 1 2 3) (4)) '((0 1 2 3) (4))))
+              (degrees->graphs '(2 2 2 2 4) 0 '((0 1 2 3) (4)) '((0 1 2 3) (4))))
 
 
 ; 0--3--2
@@ -1276,6 +1390,8 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 ; 1--4
 (check-equal? (degrees->graphs '(2 2 2 4 4) 0 '((0 1 2) (3 4)) '((0 1 2) (3 4)))
               '(((0 3) (0 4) (1 3) (1 4) (2 3) (2 4) (3 4))))
+(check-equal? (stream->list (degrees->graphs-stream '(2 2 2 4 4) 0 '((0 1 2) (3 4)) '((0 1 2) (3 4))))
+              (degrees->graphs '(2 2 2 4 4) 0 '((0 1 2) (3 4)) '((0 1 2) (3 4))))
 
 
 ; 0--2---3--1
@@ -1283,6 +1399,8 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 ; `----4----'
 (check-equal? (degrees->graphs '(2 2 3 3 4) 0 '((0 1) (2 3) (4)) '((0 1) (2 3) (4)))
               '(((0 2) (0 4) (1 3) (1 4) (2 3) (2 4) (3 4))))
+(check-equal? (stream->list (degrees->graphs-stream '(2 2 3 3 4) 0 '((0 1) (2 3) (4)) '((0 1) (2 3) (4))))
+              (degrees->graphs '(2 2 3 3 4) 0 '((0 1) (2 3) (4)) '((0 1) (2 3) (4))))
 
 ; 0
 ; |\
@@ -1291,9 +1409,13 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 ; `---4
 (check-equal? (degrees->graphs '(2 3 3 3 3) 0 '((0) (1 2 3 4)) '((0) (1 2 3 4)))
               '(((0 1) (0 2) (1 3) (1 4) (2 3) (2 4) (3 4))))
+(check-equal? (stream->list (degrees->graphs-stream '(2 3 3 3 3) 0 '((0) (1 2 3 4)) '((0) (1 2 3 4))))
+              (degrees->graphs '(2 3 3 3 3) 0 '((0) (1 2 3 4)) '((0) (1 2 3 4))))
 
-(check-equal? (degrees->graphs  '(2 2 4 4 4) 0 '((0 1) (2 3 4)) '((0 1) (2 3 4)))
+(check-equal? (degrees->graphs '(2 2 4 4 4) 0 '((0 1) (2 3 4)) '((0 1) (2 3 4)))
               '())
+(check-equal? (stream->list (degrees->graphs-stream '(2 2 4 4 4) 0 '((0 1) (2 3 4)) '((0 1) (2 3 4))))
+              (degrees->graphs '(2 2 4 4 4) 0 '((0 1) (2 3 4)) '((0 1) (2 3 4))))
 
 ;     0
 ;    / \
@@ -1304,6 +1426,8 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 ;   1---2
 (check-equal? (degrees->graphs '(2 3 3 4 4) 0 '((0) (1 2) (3 4)) '((0) (1 2) (3 4)))
               '(((0 3) (0 4) (1 2) (1 3) (1 4) (2 3) (2 4) (3 4))))
+(check-equal? (stream->list (degrees->graphs-stream '(2 3 3 4 4) 0 '((0) (1 2) (3 4)) '((0) (1 2) (3 4))))
+              (degrees->graphs '(2 3 3 4 4) 0 '((0) (1 2) (3 4)) '((0) (1 2) (3 4))))
 
 ; ,---------.
 ; 0--2---3--1
@@ -1311,9 +1435,13 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 ; `----4----'
 (check-equal? (degrees->graphs '(3 3 3 3 4) 0 '((0 1 2 3) (4)) '((0 1 2 3) (4)))
               '(((0 1) (0 2) (0 4) (1 3) (1 4) (2 3) (2 4) (3 4))))
+(check-equal? (stream->list (degrees->graphs-stream '(2 3 3 4 4) 0 '((0) (1 2) (3 4)) '((0) (1 2) (3 4))))
+              (degrees->graphs '(2 3 3 4 4) 0 '((0) (1 2) (3 4)) '((0) (1 2) (3 4))))
 
 (check-equal? (degrees->graphs '(2 4 4 4 4) 0 '((0) (1 2 3 4)) '((0) (1 2 3 4)))
               '())
+(check-equal? (stream->list (degrees->graphs-stream '(2 4 4 4 4) 0 '((0) (1 2 3 4)) '((0) (1 2 3 4))))
+              (degrees->graphs '(2 4 4 4 4) 0 '((0) (1 2 3 4)) '((0) (1 2 3 4))))
 
 
  
