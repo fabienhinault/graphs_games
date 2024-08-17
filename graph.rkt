@@ -1135,15 +1135,17 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 (define (rec-degrees->graphs degrees first-vertex all-categories first-vertex-categories)
   (define length-degrees (length degrees))
   (cond ((equal? degrees '())
-         '())
+         '());break
+        ((equal? degrees '(0))
+         '(())) ; the empty graph
+        ((and (equal? 0 (car degrees)) (memf (λ (deg) (> deg 0)) degrees))
+         '()) ; break as leading to disconnected graphs
         ((null? (car all-categories))
          (rec-degrees->graphs degrees first-vertex (cdr all-categories) first-vertex-categories))
         ((null? (car first-vertex-categories))
          (rec-degrees->graphs degrees first-vertex all-categories (cdr first-vertex-categories)))
-        ((equal? degrees '(0))
-         '(())) ; the empty graph
         ((memf (λ (deg) (>= deg length-degrees)) degrees)
-         '())
+         '());break
         (else (let* ((first-second-same-category (member (+ 1 first-vertex) (car all-categories)))
                      ;remove current vertex from categories
                      (new-all-categories (filter-out-vertex-from-categories first-vertex all-categories))
@@ -1189,12 +1191,15 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
   (define length-degrees (length degrees))
   (cond ((equal? degrees '())
          empty-stream)
+        ((equal? degrees '(0))
+          (stream '())) ; the empty graph
+        ((and (equal? 0 (car degrees)) (memf (λ (deg) (> deg 0)) degrees))
+         empty-stream) ; break as leading to disconnected graphs
         ((null? (car all-categories))
          (rec-degrees->graphs-stream degrees first-vertex (cdr all-categories) first-vertex-categories))
         ((null? (car first-vertex-categories))
          (rec-degrees->graphs-stream degrees first-vertex all-categories (cdr first-vertex-categories)))
-        ((equal? degrees '(0))
-          (stream '())) ; the empty graph
+
         ((memf (λ (deg) (>= deg length-degrees)) degrees)
          empty-stream)
         (else (let* ((first-second-same-category (member (+ 1 first-vertex) (car all-categories)))
@@ -1239,6 +1244,9 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
         (cond
           ((or (equal? degrees '()) (equal? degrees '(0)))
            (stream-cons data-edges (tail-degrees->graphs-stream (stream-rest gen-datas))))
+          ((and (equal? 0 (car degrees)) (memf (λ (deg) (> deg 0)) degrees))
+           ;do not go further on these edges, the graph will be disconnected
+           (tail-degrees->graphs-stream (stream-rest gen-datas)))
           ((null? (car all-categories))
            (tail-degrees->graphs-stream
             (stream-cons (graph-gen-data data-edges degrees first-vertex (cdr all-categories)
@@ -1249,7 +1257,7 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
             (stream-cons (graph-gen-data data-edges degrees first-vertex all-categories
                                          (cdr first-vertex-categories))
                          (stream-rest gen-datas))))
-          ((memf (λ (deg) (>= deg length-degrees)) degrees)
+          ((memf (λ (deg) (>= deg length-degrees)) degrees); impossible condition => shortcut
            (tail-degrees->graphs-stream (stream-rest gen-datas)))
           (else
            (let* ((first-second-same-category (member (+ 1 first-vertex) (car all-categories)))
@@ -1524,5 +1532,14 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 (check-equal? (stream->list (degrees->graphs-stream '(2 4 4 4 4)))
               (rec-degrees->graphs '(2 4 4 4 4) 0 '((0) (1 2 3 4)) '((0) (1 2 3 4))))
 
-
+;'((0 1) (0 2) (1 2) (3 4) (3 5) (4 5)) should not be returned, as disconnected
+(check-equal? (degrees->graphs '(2 2 2 2 2 2)) '(((0 1) (0 2) (1 3) (2 4) (3 5) (4 5))))
+(check-equal? (stream->list (degrees->graphs-stream  '(2 2 2 2 2 2)))
+              (degrees->graphs '(2 2 2 2 2 2)))
+(check-equal?
+ (stream->list
+  (tail-degrees->graphs-stream
+   (stream (graph-gen-data '() '(2 2 2 2 2 2) 0 '((0 1 2 3 4 5)) '((0 1 2 3 4 5))))))
+ '(((0 1) (0 2) (1 3) (2 4) (3 5) (4 5))))
+                                                                
  
