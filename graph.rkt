@@ -120,10 +120,16 @@
            '(()))
           ((null? (car categories))
            (rec-parts-w/nb-categories (cdr categories) nb))
-          (else (append
-                 (map (λ (_) (cons (caar categories) _))
-                      (rec-parts-w/nb-categories (cons (cdar categories) (cdr categories)) (- nb 1)))
-                 (rec-parts-w/nb-categories (cdr categories) nb)))))
+          (else
+           ; since we only take the first elements of each category,
+           ; in (car categories) we only take (caar categories).
+           ; so the results the append of
+           ; - the parts beginning with (caar categories) and
+           ; - the parts not containing (car categories)
+           (append
+            (map (λ (_) (cons (caar categories) _))
+                 (rec-parts-w/nb-categories (cons (cdar categories) (cdr categories)) (- nb 1)))
+            (rec-parts-w/nb-categories (cdr categories) nb)))))
 
 (check-equal? (rec-parts-w/nb-categories '((0)) 0) '(()))
 (check-equal? (rec-parts-w/nb-categories '(()) 0) '(()))
@@ -159,7 +165,7 @@
 (check-equal? (rec-parts-w/nb-categories '(([0 1]) ([0 2] [0 3])) 2) '(([0 1] [0 2]) ([0 2] [0 3])))
 (check-equal? (rec-parts-w/nb-categories '(([1 2]) ([1 3])) 1) '(([1 2]) ([1 3])))
 
-
+; stream version
 ; partitions of (apply append categories) having nb elements,
 ; always taking the first elements in each category
 (define (rec-parts-w/nb-categories-stream categories nb)
@@ -174,6 +180,123 @@
                       (rec-parts-w/nb-categories-stream (cons (cdar categories) (cdr categories)) (- nb 1)))
                  (rec-parts-w/nb-categories-stream (cdr categories) nb)))))
 
+; first partition of (apply append categories) having nb elements,
+; always taking the first elements in each category
+(define (first-part/nb-categories categories nb)
+    (cond ((null? categories)
+           #f)
+          ((equal? 0 nb)
+           '())
+          ((null? (car categories))
+           (first-part/nb-categories (cdr categories) nb))
+          (else
+           (let ((sub (first-part/nb-categories
+                       (cons (cdar categories) (cdr categories)) (- nb 1))))
+             (if sub
+                 (cons (caar categories) sub)
+                 (first-part/nb-categories (cdr categories) nb))))))
+
+(check-equal? (first-part/nb-categories '((0)) 0) '())
+(check-equal? (first-part/nb-categories '(()) 0) '())
+(check-equal? (first-part/nb-categories '() 1) #f)
+(check-equal? (first-part/nb-categories '((0)) 1) '(0))
+(check-equal? (first-part/nb-categories '((0)) 2) #f)
+(check-equal? (first-part/nb-categories '((0 1)) 1) '(0))
+(check-equal? (first-part/nb-categories '(() (1)) 0) '())
+(check-equal? (first-part/nb-categories '((0) (1)) 1) '(0))
+(check-equal? (first-part/nb-categories '((0 1)) 2) '(0 1))
+(check-equal? (first-part/nb-categories '((0) (1)) 2) '(0 1))
+(check-equal? (first-part/nb-categories '((0 1 2)) 1) '(0))
+(check-equal? (first-part/nb-categories '((0) (1 2)) 1) '(0))
+(check-equal? (first-part/nb-categories '((0) (1 2)) 2) '(0 1))
+(check-equal? (first-part/nb-categories '((0 1) (2)) 1) '(0))
+(check-equal? (first-part/nb-categories '((0) (1) (2)) 1) '(0))
+(check-equal? (first-part/nb-categories '((0 1 2)) 2) '(0 1))
+(check-equal? (first-part/nb-categories '((0) (1) (2)) 2) '(0 1))
+(check-equal? (first-part/nb-categories '((0 1 2)) 3) '(0 1 2))
+(check-equal? (first-part/nb-categories '((0 1 2 3)) 1) '(0))
+(check-equal? (first-part/nb-categories '((0) (1 2 3)) 1) '(0))
+(check-equal? (first-part/nb-categories '((0 1) (2 3)) 1) '(0))
+(check-equal? (first-part/nb-categories '((0 1 2) (3)) 1) '(0))
+(check-equal? (first-part/nb-categories '((0 1 2 3)) 2) '(0 1))
+(check-equal? (first-part/nb-categories '((0) (1 2 3)) 2) '(0 1))
+(check-equal? (first-part/nb-categories '((0 1) (2 3)) 2) '(0 1))
+(check-equal? (first-part/nb-categories '((0 1 2) (3)) 2) '(0 1))
+(check-equal? (first-part/nb-categories '((0 1 2 3)) 3) '(0 1 2))
+(check-equal? (first-part/nb-categories '((0) (1 2 3)) 3) '(0 1 2))
+(check-equal? (first-part/nb-categories '((0 1) (2 3)) 3) '(0 1 2))
+(check-equal? (first-part/nb-categories '((0 1 2 3)) 4) '(0 1 2 3))
+(check-equal? (first-part/nb-categories '((0 1) (2 3)) 4) '(0 1 2 3))
+(check-equal? (first-part/nb-categories '(([0 1]) ([0 2] [0 3])) 2) '([0 1] [0 2]))
+(check-equal? (first-part/nb-categories '(([1 2]) ([1 3])) 1) '([1 2]))
+
+; next partition of (apply append categories) having nb elements,
+; always taking the first elements in each category
+(define (next-part/nb-categories categories nb part)
+    (cond ((null? categories)
+           #f)
+          ((equal? 0 nb)
+           #f)
+          ((null? (car categories))
+           (next-part/nb-categories (cdr categories) nb part))
+          ((equal? (car part) (caar categories))
+               (let ((sub (next-part/nb-categories
+                           (cons (cdar categories) (cdr categories)) (- nb 1) (cdr part))))
+                 (if sub
+                     (cons (car part) sub)
+                     (first-part/nb-categories (cdr categories) nb))))
+          (else
+           (next-part/nb-categories (cdr categories) nb part))))
+
+(check-equal? (next-part/nb-categories '((0)) 0 '()) #f)
+(check-equal? (next-part/nb-categories '(()) 0 '()) #f)
+(check-equal? (next-part/nb-categories '() 1 '()) #f)
+(check-equal? (next-part/nb-categories '((0)) 1 '(0)) #f)
+(check-equal? (next-part/nb-categories '((0 1)) 1 '(0)) #f)
+(check-equal? (next-part/nb-categories '(() (1)) 0 '()) #f)
+(check-equal? (next-part/nb-categories '((0) (1)) 1 '(0)) '(1))
+(check-equal? (next-part/nb-categories '((0) (1)) 1 '(1)) #f)
+(check-equal? (next-part/nb-categories '((0 1)) 2 '(0 1)) #f)
+(check-equal? (next-part/nb-categories '((0) (1)) 2 '(0 1)) #f)
+(check-equal? (next-part/nb-categories '((0 1 2)) 1 '(0)) #f)
+(check-equal? (next-part/nb-categories '((0) (1 2)) 1 '(0)) '(1))
+(check-equal? (next-part/nb-categories '((0) (1 2)) 1 '(1)) #f)
+(check-equal? (next-part/nb-categories '((0) (1 2)) 2 '(0 1)) '(1 2))
+(check-equal? (next-part/nb-categories '((0) (1 2)) 2 '(1 2)) #f)
+(check-equal? (next-part/nb-categories '((0 1) (2)) 1 '(0)) '(2))
+(check-equal? (next-part/nb-categories '((0 1) (2)) 1 '(2)) #f)
+(check-equal? (next-part/nb-categories '((0) (1) (2)) 1 '(0)) '(1))
+(check-equal? (next-part/nb-categories '((0) (1) (2)) 1 '(1)) '(2))
+(check-equal? (next-part/nb-categories '((0) (1) (2)) 1 '(2)) #f)
+(check-equal? (next-part/nb-categories '((0 1 2)) 2 '(0 1)) #f)
+(check-equal? (next-part/nb-categories '((0) (1) (2)) 2 '(0 1)) '(0 2))
+(check-equal? (next-part/nb-categories '((0) (1) (2)) 2 '(0 2)) '(1 2))
+(check-equal? (next-part/nb-categories '((0) (1) (2)) 2 '(1 2)) #f)
+(check-equal? (next-part/nb-categories '((0 1 2)) 3 '(0 1 2)) #f)
+(check-equal? (next-part/nb-categories '((0 1 2 3)) 1 '(0)) #f)
+(check-equal? (next-part/nb-categories '((0) (1 2 3)) 1 '(0)) '(1))
+(check-equal? (next-part/nb-categories '((0) (1 2 3)) 1 '(1)) #f)
+(check-equal? (next-part/nb-categories '((0 1) (2 3)) 1 '(0)) '(2))
+(check-equal? (next-part/nb-categories '((0 1 2) (3)) 1 '(0)) '(3))
+(check-equal? (next-part/nb-categories '((0 1 2 3)) 2 '(0 1)) #f)
+(check-equal? (next-part/nb-categories '((0) (1 2 3)) 2 '(0 1)) '(1 2))
+(check-equal? (next-part/nb-categories '((0) (1 2 3)) 2 '(1 2)) #f)
+(check-equal? (next-part/nb-categories '((0 1) (2 3)) 2 '(0 1)) '(0 2))
+(check-equal? (next-part/nb-categories '((0 1) (2 3)) 2 '(0 2)) '(2 3))
+(check-equal? (next-part/nb-categories '((0 1) (2 3)) 2 '(2 3)) #f)
+(check-equal? (next-part/nb-categories '((0 1 2) (3)) 2 '(0 1)) '(0 3))
+(check-equal? (next-part/nb-categories '((0 1 2) (3)) 2 '(0 3)) #f)
+(check-equal? (next-part/nb-categories '((0 1 2 3)) 3 '(0 1 2)) #f)
+(check-equal? (next-part/nb-categories '((0) (1 2 3)) 3 '(0 1 2)) '(1 2 3))
+(check-equal? (next-part/nb-categories '((0) (1 2 3)) 3 '(1 2 3)) #f)
+(check-equal? (next-part/nb-categories '((0 1) (2 3)) 3 '(0 1 2)) '(0 2 3))
+(check-equal? (next-part/nb-categories '((0 1) (2 3)) 3 '(0 2 3)) #f)
+(check-equal? (next-part/nb-categories '((0 1 2 3)) 4 '(0 1 2 3)) #f)
+(check-equal? (next-part/nb-categories '((0 1) (2 3)) 4 '(0 1 2 3)) #f)
+(check-equal? (next-part/nb-categories '(([0 1]) ([0 2] [0 3])) 2 '([0 1] [0 2])) '([0 2] [0 3]))
+(check-equal? (next-part/nb-categories '(([0 1]) ([0 2] [0 3])) 2 '([0 2] [0 3])) #f)
+(check-equal? (next-part/nb-categories '(([1 2]) ([1 3])) 1 '([1 2])) '([1 3]))
+(check-equal? (next-part/nb-categories '(([1 2]) ([1 3])) 1 '([1 3])) #f)
 
 (define (tailrec-parts-update-result tmp-res x)
     (append
@@ -1292,7 +1415,34 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 
 (define (degrees->graphs-stream degrees)
   (define categories (get-degrees-categories degrees 0))
-  (rec-degrees->graphs-stream degrees 0 categories categories))
+  (tail-degrees->graphs-stream 
+   (stream
+    (graph-gen-data '() degrees 0 categories categories))))
+
+(define (graph->degrees g max-vertex)
+  (define degrees (make-vector (+ 1 max-vertex)))
+  (for-each
+   (λ (edge)
+     (for-each
+      (λ (vertex)
+        (vector-set! degrees vertex (+ 1 (vector-ref degrees vertex))))
+      edge))
+   g)
+  (vector->list degrees))
+
+(check-equal? (graph->degrees '((0 1)) 1) '(1 1))
+(check-equal? (graph->degrees '((0 1) (0 2) (0 4) (1 3) (1 4) (2 3) (2 4) (3 4)) 4) '(3 3 3 3 4))
+
+(define (remove-vertex graph vertex)
+  (filter (λ (edge) (not (member vertex edge))) graph))
+
+(check-equal? (remove-vertex '((0 1) (0 2) (0 4) (1 3) (1 4) (2 3) (2 4) (3 4)) 4)
+              '((0 1) (0 2) (1 3) (2 3)))
+
+(define (next-graph graph max-vertex)
+  (define degrees (graph->degrees graph max-vertex))
+  (define categories (get-degrees-categories degrees))
+  (rec-degrees->graphs degrees (remove-vertex graph max-vertex) (- max-vertex 1) categories categories))
 
 (check-equal? (rec-degrees->graphs '(0 2) 3 '((4)) '((4))) '())
 (check-equal? (stream->list (rec-degrees->graphs-stream  '(0 2) 3 '((4)) '((4))))
