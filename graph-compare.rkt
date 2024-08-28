@@ -1,8 +1,22 @@
 #lang racket
 
-(require srfi/67) ; compare procedures
+(require (for-syntax srfi/67)) ; compare procedures
+(require srfi/67)
 (require "graph-utils.rkt")
 
+(define-for-syntax (compare-to< compare)
+  (λ (_1 _2) (< 0 (compare _1 _2))))
+
+(define-for-syntax (<to-compare <)
+  (λ (_1 _2)
+    (cond ((< _1 _2) -1)
+          ((< _2 _1) 1)
+          (else 0))))
+
+(define-syntax (refine< stx)
+  (syntax-case stx ()
+    ((_ < ...)
+     #`(compare-to< (refine-compare (<to-compare <) ...)))))
 
 (define (deep f l)
     (cond ((null? l) '())
@@ -95,4 +109,4 @@
           (symbol-compare (car e1) (car e2))
           (symbol-compare (cadr e1) (cadr e2))))))))
 
-(provide edge<?*)
+(provide edge<?* refine<)

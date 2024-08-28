@@ -5,18 +5,11 @@
 (require racket/random)
 (require racket/trace)
 (require json)
-(require net/base64)
-(require file/md5)
 (require "combinatorics.rkt")
 (require "graph-compare.rkt")
+(require "graph-output.rkt")
+(require "graph-random.rkt")
 (require "graph-utils.rkt")
-
-(define (graph-first-node g)
-  (caar g))
-
-; second node of first edge of g
-(define (graph-second-node g)
-  (cadar g))
 
 (define (graphs1 l)
   (tailrec-parts '(()) (tailrec-couples '() l)))
@@ -36,38 +29,8 @@
 (define (contains-deep? l x)
   (member x (flatten l)))
 
-; does the graph g contains all of elements of the list l
-(define (contains-all? g l)
-  (cond ((null? l) true)
-        ((null? g) l)
-        (else (contains-all?
-               (cdr g)
-               (filter (λ(s) (not (or (equal? s (graph-first-node g))
-                                      (equal? s (graph-second-node g)))))
-                       l)))))
-
-(define (add-absent-vertices g vertices)
-  (let ((missing-vertices (contains-all? g vertices)))
-    (if (equal? missing-vertices #t)
-        g
-        (let* ((result (append g
-                               (map (λ (vertex) (random-edge-from vertices vertex))
-                                    missing-vertices)))
-               (missing-from-result (contains-all? result vertices)))
-          (when (not (equal? missing-from-result #t)) (raise (list g '() '() result)))
-          result))))
 
 
-
-(define (tailrec-graph->node-set graph nodes-set)
-  (if (null? graph)
-      nodes-set
-      (tailrec-graph->node-set
-       (cdr graph)
-       (set-add (set-add nodes-set (graph-first-node graph)) (graph-second-node graph)))))
-
-(define (graph->node-set graph)
-  (tailrec-graph->node-set graph (set)))
 
 ; nodes-so-far-set = vertices reached from the first one
 ; unused-edges = edges that do not connect to the vertices of nodes-so-far-set
@@ -159,11 +122,6 @@
 
 (check-equal? (tailrec-sorted-parts '(()) '(a z e) symbol<?)
               '(() (a) (z) (a z) (e) (a e) (e z) (a e z)))
-
-(define (deep f l)
-    (cond ((null? l) '())
-          ((pair? l) (cons (deep f (car l)) (deep f (cdr l))))
-          (else (f l))))
 
 (define (replace-all-deep old new l)
   (cond ((null? l) '())
@@ -273,15 +231,6 @@
 (check-not-false (member (hash->list (get-degree-renaming '((0 1) (0 2)) 3 (new-name-numeric-generator)))
               '(((0 . 2) (2 . 1) (1 . 0)) ((0 . 2) (1 . 0) (2 . 1)))))
 
-(define (get-graph-degrees graph)
-  (deep (λ (_) (get-degree _ graph)) graph))
-
-(check-equal? (get-graph-degrees '((a z) (a e))) '((2 1) (2 1)))
-(define (get-graph-degree-1-vertices graph vertices)
-  (filter (λ (_) (equal? 1 (get-degree _ graph)))
-          vertices))
-
-
 
 (define (edge-other-vertex edge vertex)
   (car (filter (λ (v) (not (equal? v vertex))) edge)))
@@ -316,7 +265,7 @@
 ; edges are sorted
 (define (labelled-graph->unlabelled labelled)
   (define degrees (make-hash))
-  (deep (λ (_) (hash-set! degrees _ (get-degree _ graph))) graph)
+  (deep (λ (_) (hash-set! degrees _ (get-degree _ labelled))) labelled)
   (define (vertice-compare v1 v2)
     (refine-compare
         (integer-compare (hash-ref degrees v1) (hash-ref degrees v2))
@@ -405,115 +354,6 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
            (list "}
 "))))
 
-(define A0 (char->integer #\A))
-(define a26 (- (char->integer #\a) 26))
-(define _052 (- (char->integer #\0) 52))
-
-(define (number->base64 n)
-  (cond ((< n 26) (integer->char (+ n A0)))
-        ((< n 52) (integer->char (+ n a26)))
-        ((< n 62) (integer->char (+ n _052)))
-        ((equal? n 62) #\-)
-        ((equal? n 63) #\_)))
-
-(define (graph-long-name g)
-  (list->string (map number->base64 (flatten g))))
-
-(check-equal? (graph-long-name '((0 1) (0 2))) "ABAC")
-
-(define (bits-reorder g)
-  (sort
-   (map (λ (e) (sort e <)) g)
-   (λ (e1 e2)
-     (equal?
-      -1
-      (refine-compare
-       (integer-compare (cadr e1) (cadr e2))
-       (integer-compare (car e1) (car e2)))))))
-
-; https://users.cecs.anu.edu.au/~bdm/data/formats.txt
-(define (graph->bits nb-vertices g)
-  (define reordered (bits-reorder g))
-  (define bits (make-vector (/ (* nb-vertices (- nb-vertices 1)) 2)))
-  (for-each
-   (λ (e) (let ((v2 (cadr e)))
-            (vector-set! bits (+ (/ (* v2 (- v2 1)) 2)
-                                 (car e)) 1)))
-   reordered)
-  bits)
-
-(check-equal? (graph->bits 3 '((0 1) (0 2))) #(1 1 0))
-(check-equal? (graph->bits 4 '((0 1) (0 2) (0 3))) #(1 1 0 1 0 0))
-(check-equal? (graph->bits 5 '((0 1) (0 2) (0 3) (0 4))) #(1 1 0 1 0 0 1 0 0 0))
-
-(define (bits->v6s bits)
-  (define len (vector-length bits))
-  (if (<= len 6)
-      (cons (vector-append bits (make-vector (- 6 len))) '())
-      (let-values (((head rest) (vector-split-at bits 6)))
-        (cons head (bits->v6s rest)))))
-                   
-(check-equal? (bits->v6s  #(1 1 0 1)) '(#(1 1 0 1 0 0)))
-(check-equal? (bits->v6s  #(1 1 0 1 0 0)) '(#(1 1 0 1 0 0)))
-(check-equal? (bits->v6s  #(1 1 0 1 0 0 1 0 0 0)) '(#(1 1 0 1 0 0) #(1 0 0 0 0 0)))
-
-(define (v6->number v6)
-  (foldl
-   (λ (coeff acc) (+ coeff (* 2 acc)))
-   0
-   (vector->list v6)))
-
-(check-equal? (v6->number #(1 0 0 0 0 0)) 32)
-(check-equal? (v6->number #(0 0 0 0 0 1)) 1)
-
-(define (v6->base64-char v6)
-  (number->base64 (v6->number v6)))
-
-(check-equal? (v6->base64-char #(1 0 0 0 0 0)) #\g)
-(check-equal? (v6->base64-char #(0 0 0 0 0 1)) #\B)
-
-
-(define (graph->g64 nb-vertices g)
-  (list->string (cons (number->base64 nb-vertices)
-                      (map v6->base64-char (bits->v6s (graph->bits nb-vertices g))))))
-
-(check-equal? (graph->g64 3 '((0 1) (0 2))) "Dw")
-(check-equal? (graph->g64 4 '((0 1) (0 2) (0 3))) "E0")
-(check-equal? (graph->g64 5 '((0 1) (0 2) (0 3) (0 4))) "F0g")
-(check-equal?
- (graph->g64
-  30
-  '((0 1) (2 3) (4 5) (6 7) (6 11) (8 9) (10 9) (12 13) (14 13) (14 15) (16 17) (18 15) (0 20) (1 19)
-          (2 19) (4 20) (8 22) (10 22) (12 21) (16 20) (18 19) (3 23) (5 23) (7 23) (5 27) (7 11)
-          (24 25) (24 26) (3 21) (24 20) (25 27) (26 27) (28 29) (9 15) (25 13) (27 13) (28 17)
-          (29 13) (29 15) (29 17) (9 21) (11 21) (11 22) (25 22) (26 21) (26 22) (28 20) (28 21)
-          (15 17) (17 19) (19 20) (19 22)))
- "ehAIAEAAIAgYAAAAgAIAhAAAAAYAAjAAOIAJEFgABYCCoAAAAAIAAQCgAADQICADAABMAABUAI")
-(check-equal?
- (string-length (graph->g64
-  30
-  '((0 1) (2 3) (4 5) (6 7) (6 11) (8 9) (10 9) (12 13) (14 13) (14 15) (16 17) (18 15) (0 20) (1 19)
-          (2 19) (4 20) (8 22) (10 22) (12 21) (16 20) (18 19) (3 23) (5 23) (7 23) (5 27) (7 11)
-          (24 25) (24 26) (3 21) (24 20) (25 27) (26 27) (28 29) (9 15) (25 13) (27 13) (28 17)
-          (29 13) (29 15) (29 17) (9 21) (11 21) (11 22) (25 22) (26 21) (26 22) (28 20) (28 21)
-          (15 17) (17 19) (19 20) (19 22))))
- 74)
-
-(define (graph->md5-64 g)
-  (foldl
-   (λ (e acc) (string-replace acc (car e) (cdr e)))
-   (bytes->string/utf-8 (base64-encode (md5 (~a g) #f)))
-   (list (cons "+" "-") (cons "/" "_") (cons "=" "") (cons "\r" "") (cons "\n" ""))))
-
-(check-equal?
- (graph->md5-64
-  '((0 1) (2 3) (4 5) (6 7) (6 11) (8 9) (10 9) (12 13) (14 13) (14 15) (16 17) (18 15) (0 20) (1 19)
-          (2 19) (4 20) (8 22) (10 22) (12 21) (16 20) (18 19) (3 23) (5 23) (7 23) (5 27) (7 11)
-          (24 25) (24 26) (3 21) (24 20) (25 27) (26 27) (28 29) (9 15) (25 13) (27 13) (28 17)
-          (29 13) (29 15) (29 17) (9 21) (11 21) (11 22) (25 22) (26 21) (26 22) (28 20) (28 21)
-          (15 17) (17 19) (19 20) (19 22)))
- "fuD_Gbyj9B60EZoT5uQRBQ")
-
 (define (make-directory-and-parents dir)
   (when (not (directory-exists? dir))
     (make-directory-and-parents (simplify-path (build-path dir 'up)))
@@ -530,15 +370,6 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
     (λ() (display "export const nextss = ")
       (write-json (get-graph-nextss g (length vertices)))))
   graph-dir)
-
-(define (random-edge-from vertices vertex)
-  (list vertex (random-ref (remove vertex vertices))))
-
-(define (random-edge vertices)
-  (random-edge-from vertices (random-ref vertices)))
-
-(define (random-graph l nb-edges)
-  (remove-duplicates (build-list nb-edges (λ (_) (random-edge l)))))
 
 (define (get-new-edgess n)
   (let* ((new-node (- n 1))
@@ -640,25 +471,6 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
    graph))
 
 
-(define (make-all-vertices-degree2 graph vertices)
-  (define result (append graph
-                         (map (λ (vertex) (random-edge-from vertices vertex))
-                              (get-graph-degree-1-vertices graph vertices))))
-  (when (not (null? (get-graph-degree-1-vertices result vertices)))
-    (raise (list graph '() '() result)))
-  result)
-
-(check-equal?
- '()
- (get-graph-degree-1-vertices
-  (make-all-vertices-degree2
-   '((3 26) (7 16) (20 8) (28 20) (7 22) (6 3) (28 1) (22 12) (27 11) (21 2) (15 6) (2 19) (26 14)
-            (1 26) (0 5) (10 4) (16 12) (18 17) (1 11) (8 5) (5 9) (21 7) (12 21) (15 18) (22 1)
-            (0 11) (27 8) (26 29) (5 15) (19 18) (10 16) (9 5) (9 1) (10 17) (18 21) (3 1) (16 7)
-            (10 0) (29 4) (20 26) (1 29) (13 28) (19 2) (17 7) (8 17) (13 16) (24 3) (26 22) (23 20)
-            (25 2))
-   (range 30))
-  (range 30)))
 
 
 (define (create-random-edinburgh-graph vertices nb-edges)
