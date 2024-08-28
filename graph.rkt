@@ -281,6 +281,57 @@
   (filter (λ (_) (equal? 1 (get-degree _ graph)))
           vertices))
 
+
+
+(define (edge-other-vertex edge vertex)
+  (car (filter (λ (v) (not (equal? v vertex))) edge)))
+
+(define (edges-having-vertex graph vertex)
+  (filter (λ (edge) (member edge vertex)) graph))
+
+(define (get-neighbours vertex graph)
+  (map (λ (edge) (edge-other-vertex edge vertex))
+       (edges-having-vertex graph vertex)))
+
+(define (min&args xs f)
+  (foldl
+   (λ (x acc)
+     (let ((value (f x)))
+       (cond ((< (car acc) value) acc)
+             ((equal? (car acc) value) (cons (car acc) (cons x (cdr acc))))
+             (else (cons value x)))))))
+
+
+(define (get-neighbours-min-degree vertex graph get-vertex-degree)
+  (define vertex-degree (get-vertex-degree vertex))
+  (define neighbours-greater-degree (filter (λ (v) (<= vertex-degree (get-vertex-degree v)))
+    (get-neighbours vertex graph)))
+  (min&args neighbours-greater-degree get-vertex-degree))
+
+; in each edge, the vertices are sorted by their numbers.
+; if n(v1) < n(v2) then deg(v1) <= deg(v2).
+; if n(v1) < n(v2) and deg(v1) == deg(v2)
+; then the degree of the least neighbour of v1 greater than v1 is less of equal to
+; degree of the least neighbour of v2 greater than v2
+; edges are sorted
+(define (labelled-graph->unlabelled labelled)
+  (define degrees (make-hash))
+  (deep (λ (_) (hash-set! degrees _ (get-degree _ graph))) graph)
+  (define (vertice-compare v1 v2)
+    (refine-compare
+        (integer-compare (hash-ref degrees v1) (hash-ref degrees v2))
+        (integer-compare v1 v2)))
+  (define (vertice<? v1 v2) (< (vertice-compare v1 v2)
+                               0))
+  '()
+)
+
+
+; do not rename vertices
+; reorder vertices in edges and edges in graph by ascending degree
+; get-graph-degrees applied to the returned graph gives
+; a lexicographically sorted suite of pairs of integer.
+; it does not return a canonical form of an unlabelled graph.
 (define (rewrite-graph graph)
   (define degrees (make-hash))
   (deep (λ (_) (hash-set! degrees _ (get-degree _ graph))) graph)
