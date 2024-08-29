@@ -381,6 +381,32 @@
   (check-equal? (parts-w/nb '(0 1 2 3) 3) '((2 1 0) (3 1 0) (3 2 0) (3 2 1)))
   (check-equal? (parts-w/nb '(0 1 2 3) 4) '((3 2 1 0))))
 
+
+; util function for tailrec-sorted-parts
+(define (tailrec-sorted-parts-update-result tmp-res x less-than?)
+  (append
+   tmp-res
+   (map
+    (lambda (_) (sort (cons x _) less-than?))
+    tmp-res)))
+
+(module+ test
+  (check-equal? (tailrec-sorted-parts-update-result '((e) ()) 'z symbol<?) '((e) () (e z) (z))))
+
+(define (tailrec-sorted-parts res l less-than?)
+  (if (null? l)
+      res
+      (tailrec-sorted-parts
+       (tailrec-sorted-parts-update-result res (car l) less-than?)
+       (cdr l)
+       less-than?)))
+
+(module+ test
+  (check-equal? (tailrec-sorted-parts '(()) '(a z e) symbol<?)
+                '(() (a) (z) (a z) (e) (a e) (e z) (a e z))))
+
+
+
 (provide
  tailrec-couples
  tailrec-parts

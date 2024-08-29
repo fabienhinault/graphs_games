@@ -10,21 +10,7 @@
 (require "graph-output.rkt")
 (require "graph-random.rkt")
 (require "graph-utils.rkt")
-
-(define (graphs1 l)
-  (tailrec-parts '(()) (tailrec-couples '() l)))
-
-(check-equal?
- (graphs1 '(a e z))
- '(() ((a e)) ((a z)) ((a z) (a e)) ((e z)) ((e z) (a e)) ((e z) (a z)) ((e z) (a z) (a e))))
-
-(define (graphs11 nb-vertices nb-edges)
-  (parts-w/nb (tailrec-couples '() (range nb-vertices)) nb-edges))
-
-;(remove-duplicates (map rewrite-graph (filter has-no-vertex-degree-1 (filter (λ (_) (equal? #t (contains-all? _ (range 9)))) (graphs11 9 13))))))
-      
-
-(check-equal? (graphs11 3 2) '(((0 2) (0 1)) ((1 2) (0 1)) ((1 2) (0 2))))
+     
 
 (define (contains-deep? l x)
   (member x (flatten l)))
@@ -32,108 +18,6 @@
 
 
 
-; nodes-so-far-set = vertices reached from the first one
-; unused-edges = edges that do not connect to the vertices of nodes-so-far-set
-(define (tailrec-is-graph-connected? graph all-nodes-set nodes-so-far-set unused-edges)
-  (if (null? graph)
-      (if (null? unused-edges)
-          (set=? all-nodes-set nodes-so-far-set)
-          (if (set-empty? (set-intersect (graph->node-set unused-edges) nodes-so-far-set))
-              ; not connected. propose an edge to add.
-              (list (graph-first-node unused-edges) (set-first nodes-so-far-set))
-              (tailrec-is-graph-connected? unused-edges all-nodes-set nodes-so-far-set '())))
-      (cond ((set-member? nodes-so-far-set (graph-first-node graph))
-             ; if the first vertex of the remaining edges is in the nodes reached,
-             ; then add the second vertex
-             (tailrec-is-graph-connected?
-              (cdr graph)
-              all-nodes-set
-              (set-add nodes-so-far-set (graph-second-node graph))
-              unused-edges))
-            ((set-member? nodes-so-far-set (graph-second-node graph))
-             ; if not, but the second vertex is, then add the first one
-             (tailrec-is-graph-connected?
-              (cdr graph)
-              all-nodes-set
-              (set-add nodes-so-far-set (graph-first-node graph))
-              unused-edges))
-            (else
-             ; if none are add the first edge to unused-edges
-             (tailrec-is-graph-connected?
-              (cdr graph)
-              all-nodes-set
-              nodes-so-far-set
-              (cons (car graph) unused-edges))))))
-
-(define set-abcd  (set 'a 'b 'c 'd))
-(check-true (tailrec-is-graph-connected? '((a b) (c d) (a c))
-                                        (set 'a 'b 'c 'd)
-                                        (set 'a)
-                                        '()))
-(check-true (tailrec-is-graph-connected? '((a b) (a d) (a c))
-                                        (set 'a 'b 'c 'd)
-                                        (set 'a)
-                                        '()))
-(check-not-equal? true (tailrec-is-graph-connected? '((a b) (c d)) (set 'a 'b 'c 'd) (set 'a) '()))
-(check-not-equal? true (tailrec-is-graph-connected? '((c d)) (set 'a 'b 'c 'd) (set 'a ' b) '()))
-(check-not-equal? true (tailrec-is-graph-connected? '() (set 'a 'b 'c 'd) (set 'a ' b) '((c d))))
-(check-true (tailrec-is-graph-connected? '((a b) (b c)) (set 'a 'b 'c) (set 'a) '()))
-(check-true (tailrec-is-graph-connected? '((a b) (a c)) (set 'a 'b 'c) (set 'a) '()))
-(check-true (tailrec-is-graph-connected? '((a b)) (set 'a 'b) (set 'a) '()))
-(check-true (tailrec-is-graph-connected? '() (set) (set) '()))
-
-(define (rec-connect-graph g nodes-set)
-  (let ((complete (tailrec-is-graph-connected? g nodes-set (set (graph-first-node g)) '())))
-    (cond ((equal? complete #t)
-           g)
-          ((equal? complete #f)
-           (raise g))
-          (else 
-           (rec-connect-graph (cons complete g) nodes-set)))))
-
-(if (equal? (version) "8.9")
-    (check-equal? (rec-connect-graph '((a b) (c d)) set-abcd) '((c b) (a b) (c d)))
-    (check-equal? (rec-connect-graph '((a b) (c d)) set-abcd) '((c a) (a b) (c d))))
-
-(define (graphs1_1 l)
-  (filter (λ(g) (equal? #t (contains-all? g l))) (graphs1 l)))
-
-(check-equal?
- (graphs1_1 '(a e z))
- '(((a z) (a e)) ((e z) (a e)) ((e z) (a z)) ((e z) (a z) (a e))))
-
-; util function for tailrec-sorted-parts
-(define (tailrec-sorted-parts-update-result tmp-res x less-than?)
-  (append
-   tmp-res
-   (map
-    (lambda (_) (sort (cons x _) less-than?))
-    tmp-res)))
-
-(check-equal? (tailrec-sorted-parts-update-result '((e) ()) 'z symbol<?) '((e) () (e z) (z)))
-
-(define (tailrec-sorted-parts res l less-than?)
-  (if (null? l)
-      res
-      (tailrec-sorted-parts
-       (tailrec-sorted-parts-update-result res (car l) less-than?)
-       (cdr l)
-       less-than?)))
-
-(check-equal? (tailrec-sorted-parts '(()) '(a z e) symbol<?)
-              '(() (a) (z) (a z) (e) (a e) (e z) (a e z)))
-
-(define (replace-all-deep old new l)
-  (cond ((null? l) '())
-        ((equal? l old) new)
-        ((pair? l) (cons (replace-all-deep old new (car l)) (replace-all-deep old new (cdr l))))
-        (else l)))
-
-(check-equal? (replace-all-deep 'a 'b '()) '())
-(check-equal? (replace-all-deep 'a 'b 'a) 'b)
-(check-equal? (replace-all-deep 'a 'b 'b) 'b)
-(check-equal? (replace-all-deep 'a 'b 'z) 'z)
-(check-equal? (replace-all-deep 'a 'b '((a z) (e r))) '((b z) (e r)))
 
 (define (new-name-numeric-generator)
   (let ((count 0))
@@ -141,49 +25,6 @@
             count
             (set! count (+ 1 count))))))
 
-; auxiliary function for get-graph-nodes-by-degrees
-(define (add-node-by-degree acc v degree)
-  (let ((all-nodes (vector-ref acc 0))
-        (deg-nodes (vector-ref acc degree)))
-    (when (not (member v all-nodes))
-      (let ((new-all (cons v all-nodes))
-            (new-deg (cons v deg-nodes)))
-        (vector-set! acc 0 new-all)
-        (vector-set! acc degree new-deg)))
-    acc))
-
-(check-equal? (add-node-by-degree (make-vector 6 '()) 'a 3)
-              '#((a) () () (a) () ()))
-
-; auxiliary function for get-graph-nodes-by-degrees
-(define (add-edge-nodes-by-degrees* graph)
-  (λ (edge acc)
-    (let* ((v1 (car edge))
-           (deg1 (get-degree v1 graph))
-           (v2 (cadr edge))
-           (deg2 (get-degree v2 graph)))
-      (add-node-by-degree (add-node-by-degree acc v1 deg1) v2 deg2))))
-
-(check-equal? ((add-edge-nodes-by-degrees* '((a b))) '(a b) (make-vector 2 '()))
-              '#((b a) (b a)))
-
-(let ((add-edge-nodes-by-degrees (add-edge-nodes-by-degrees* '((a b) (a c))))
-      (acc (make-vector 3 '())))
-  (check-equal? (add-edge-nodes-by-degrees '(a b) acc)
-                '#((b a) (b) (a)))
-  (check-equal? acc '#((b a) (b) (a)))
-  (check-equal? (add-edge-nodes-by-degrees '(a c) acc)
-                '#((c b a) (c b) (a)))
-  )
-
-(define (get-graph-nodes-by-degrees graph nb-vertices)
-  (vector-map reverse
-              (foldl (add-edge-nodes-by-degrees* graph)
-                     (make-vector nb-vertices '())
-                     graph)))
-
-(check-equal? (get-graph-nodes-by-degrees '((a b) (a c)) 3)
-              '#((a b c) (b c) (a)))
 
 
 (define (add-edge-to-graph-vector edge acc-vector-nextss)
@@ -1226,8 +1067,8 @@ node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
 ; `----4----'
 (check-equal? (degrees->graphs '(3 3 3 3 4))
               '(((0 1) (0 2) (0 4) (1 3) (1 4) (2 3) (2 4) (3 4))))
-(check-equal? (stream->list (rec-degrees->graphs-stream '(2 3 3 4 4) 0 '((0) (1 2) (3 4)) '((0) (1 2) (3 4))))
-              (rec-degrees->graphs '(2 3 3 4 4) 0 '((0) (1 2) (3 4)) '((0) (1 2) (3 4))))
+(check-equal? (stream->list (rec-degrees->graphs-stream '(3 3 3 3 4) 0 '((0 1 2 3) (4)) '((0 1 2 3) (4))))
+              (degrees->graphs '(3 3 3 3 4)))
 
 (check-equal? (rec-degrees->graphs '(2 4 4 4 4) 0 '((0) (1 2 3 4)) '((0) (1 2 3 4)))
               '())

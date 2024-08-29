@@ -48,4 +48,22 @@
      (range 30))
     (range 30))))
 
-(provide add-absent-vertices random-graph make-all-vertices-degree2)
+
+(define (rec-connect-graph g nodes-set)
+  (let ((complete (tailrec-is-graph-connected? g nodes-set (set (graph-first-node g)) '())))
+    (cond ((equal? complete #t)
+           g)
+          ((equal? complete #f)
+           (raise g))
+          (else 
+           (rec-connect-graph (cons complete g) nodes-set)))))
+
+(module+ test
+  (define set-abcd  (set 'a 'b 'c 'd))
+  (if (equal? (version) "8.9")
+      (check-equal? (rec-connect-graph '((a b) (c d)) set-abcd) '((c b) (a b) (c d)))
+      (check-equal? (rec-connect-graph '((a b) (c d)) set-abcd) '((c a) (a b) (c d)))))
+
+
+(provide add-absent-vertices random-graph make-all-vertices-degree2
+         rec-connect-graph)
