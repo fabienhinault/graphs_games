@@ -1,6 +1,9 @@
 #lang racket
 
 
+(define (not-null? l)
+  (not (null? l)))
+
 (define (min&args xs f)
   (foldl
    (λ (x acc)
@@ -186,6 +189,7 @@
               (foldl (add-edge-nodes-by-degrees* graph)
                      (make-vector nb-vertices '())
                      graph)))
+
 (module+ test
   (check-equal? (get-graph-nodes-by-degrees '((a b) (a c)) 3)
                 '#((a b c) (b c) (a)))
@@ -203,8 +207,23 @@
   (map (λ (edge) (edge-other-vertex edge vertex))
        (edges-having-vertex graph vertex)))
 
+
+(define (has-vertex-degree-1 graph)
+  (member 1 (flatten (deep (λ (_) (get-degree _ graph)) graph))))
+
+(define (has-no-vertex-degree-1 graph)
+  (not (has-vertex-degree-1 graph)))
+
+(module+ test
+  (check-equal? (has-vertex-degree-1 '((0 1) (2 3) (1 3))) '(1 2 1 2 2 2))
+  (check-false
+   (has-vertex-degree-1 '((0 1) (0 2) (0 3) (1 2) (1 3) (2 3)))))
+
+
 (provide
  deep
+ min&args
+ not-null?
  get-degree
  get-graph-degrees
  contains-all?
@@ -212,5 +231,4 @@
  tailrec-is-graph-connected?
  get-graph-nodes-by-degrees
  get-neighbours
- min&args
  )

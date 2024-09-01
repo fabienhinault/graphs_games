@@ -65,5 +65,25 @@
       (check-equal? (rec-connect-graph '((a b) (c d)) set-abcd) '((c a) (a b) (c d)))))
 
 
+
+(define (pick-random-vertex graph forbidden-vertex)
+  (let* ((picked-edge (random-ref graph))
+         (picked-vertex (car picked-edge)))
+    (if (not (equal? picked-vertex forbidden-vertex))
+        picked-vertex
+        (let ((picked-vertex (cadr picked-edge)))
+          (if (not (equal? picked-vertex forbidden-vertex))
+              picked-vertex
+              (pick-random-vertex graph forbidden-vertex))))))
+
+
+ 
+(define (add-random-edge graph vertex)
+  (cons
+   (list vertex
+         (pick-random-vertex graph vertex))
+   graph))
+
+
 (provide add-absent-vertices random-graph make-all-vertices-degree2
          rec-connect-graph)

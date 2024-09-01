@@ -60,7 +60,7 @@
    (integer-compare (car e1) (car e2))
    (integer-compare (cadr e1) (cadr e2))))
 
-; the vertices are supposed to be sorted in the edge
+; the vertices are supposed to be sorted in the edges
 (define (edge<?* get-vertex-degree)
   (let ((edge-degree-compare (edge-degree-compare* get-vertex-degree)))
     (λ (e1 e2)
