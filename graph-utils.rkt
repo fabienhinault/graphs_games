@@ -1,6 +1,16 @@
 #lang racket
 
 
+(define (min&args xs f)
+  (foldl
+   (λ (x acc)
+     (let ((value (f x)))
+       (cond ((< (car acc) value) acc)
+             ((equal? (car acc) value) (cons (car acc) (cons x (cdr acc))))
+             (else (cons value x)))))))
+
+(define (contains-deep? l x)
+  (member x (flatten l)))
 
 (define (replace-all-deep old new l)
   (cond ((null? l) '())
@@ -183,6 +193,16 @@
                 '#((0 3 4 1 2) () (0) (1 2) (3 4))))
 
 
+(define (edge-other-vertex edge vertex)
+  (car (filter (λ (v) (not (equal? v vertex))) edge)))
+
+(define (edges-having-vertex graph vertex)
+  (filter (λ (edge) (member edge vertex)) graph))
+
+(define (get-neighbours vertex graph)
+  (map (λ (edge) (edge-other-vertex edge vertex))
+       (edges-having-vertex graph vertex)))
+
 (provide
  deep
  get-degree
@@ -191,4 +211,6 @@
  graph->node-set graph-first-node graph-second-node get-graph-degree-1-vertices
  tailrec-is-graph-connected?
  get-graph-nodes-by-degrees
+ get-neighbours
+ min&args
  )

@@ -3,6 +3,7 @@
 (require srfi/67)
 (require net/base64)
 (require file/md5)
+(require json)
 
 (define A0 (char->integer #\A))
 (define a26 (- (char->integer #\a) 26))
@@ -124,4 +125,62 @@
    "fuD_Gbyj9B60EZoT5uQRBQ"))
 
 
-(provide graph->md5-64)
+(define (vertex-dot v)
+    (~a v " [id=\"id" v "\"]" #\newline))
+
+(define (edge-dot e)
+  (~a (car e) " -- " (cadr e) " [class=\"_" (car e) "_ _" (cadr e)  "_\"]" #\newline))
+
+(module+ test
+  (check-equal?
+   (edge-dot '(a z)) "a -- z [class=\"_a_ _z_\"]
+"))
+
+(define (graph-dot g vertices)
+  (string-append*
+   "strict graph {
+node [shape=circle style=filled fillcolor=gray99 width=0.5 fixedsize=shape]
+"
+   (append (list "🤖 [id=\"robot_begins\" fontsize=23]\n")
+           (map vertex-dot vertices)
+           (map edge-dot g)
+           (list "}
+"))))
+
+
+; util function for get-graph-nextss
+(define (add-edge-to-graph-vector edge acc-vector-nextss)
+  (vector-set! acc-vector-nextss (car edge)
+               (cons (cadr edge) (vector-ref acc-vector-nextss (car edge))))
+  (vector-set! acc-vector-nextss (cadr edge)
+               (cons (car edge) (vector-ref acc-vector-nextss (cadr edge))))
+  acc-vector-nextss)
+
+; for each vertex, the list of adjascent vertices
+(define (get-graph-nextss graph nb-vertices)
+  (vector->list (foldl add-edge-to-graph-vector (make-vector nb-vertices '()) graph)))
+
+(module+ test
+  (require rackunit)
+  (check-equal? (get-graph-nextss '((0 2) (1 2)) 3) '((2) (2) (1 0))))
+
+(define (make-directory-and-parents dir)
+  (when (not (directory-exists? dir))
+    (make-directory-and-parents (simplify-path (build-path dir 'up)))
+    (make-directory dir)))
+
+
+(define (write-dot-file g dir vertices)
+  (define md5 (graph->md5-64 g))
+  (define graph-dir (~a dir "/" md5))
+  (when (not (directory-exists? graph-dir))
+      (make-directory-and-parents graph-dir))
+  (with-output-to-file (~a graph-dir "/_.dot")
+    (λ() (printf (graph-dot g vertices))))
+  (with-output-to-file (~a graph-dir "/_.js")
+    (λ() (display "export const nextss = ")
+      (write-json (get-graph-nextss g (length vertices)))))
+  graph-dir)
+
+
+(provide graph->md5-64 write-dot-file)
