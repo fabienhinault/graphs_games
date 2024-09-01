@@ -11,8 +11,6 @@
     (λ () (begin0
             count
             (set! count (+ 1 count))))))
-
-
          
 ; node-renamings: a hash map linking old vertices names to new ones
 ; new-names: a function returning a new unused name each time it is called
@@ -35,6 +33,34 @@
           (hash-set! node-renamings vertex new-name)
           new-name))))
 
+(define (rename-numeric-graph graph new-names)
+  (map (λ (e) (rename-numeric-edge e new-names))
+       graph))
+
+(define (rename-numeric-edge edge new-names)
+  (map (λ (v) (rename-numeric-vertex v new-names))
+       edge))
+
+(define (rename-numeric-vertex vertex new-names)
+  (list-ref new-names vertex))
+
+(module+ test
+  (let*
+      ((G '((0 1) (2 3) (4 5) (6 7) (6 11) (8 9) (10 9) (12 13) (14 13) (14 15) (16 17) (18 15) (0 20) (1 19)
+                  (2 19) (4 20) (8 22) (10 22) (12 21) (16 20) (18 19) (3 23) (5 23) (7 23) (5 27) (7 11)
+                  (24 25) (24 26) (3 21) (24 20) (25 27) (26 27) (28 29) (9 15) (25 13) (27 13) (28 17)
+                  (29 13) (29 15) (29 17) (9 21) (11 21) (11 22) (25 22) (26 21) (26 22) (28 20) (28 21)
+                  (15 17) (17 19) (19 20) (19 22))))
+    (check-equal?
+     (rename-numeric-graph
+      G
+      '(0 1 2 4 6 8 10 12 14 16 18 23 3 5 7 24 27 25 26 28 29 9 11 17 15 13 19 20 22 21))
+     '((0 1) (2 4) (6 8) (10 12) (10 23) (14 16) (18 16) (3 5) (7 5) (7 24) (27 25) (26 24) (0 29)
+             (1 28) (2 28) (6 29) (14 11) (18 11) (3 9) (27 29) (26 28) (4 17) (8 17) (12 17) (8 20)
+             (12 23) (15 13) (15 19) (4 9) (15 29) (13 20) (19 20) (22 21) (16 24) (13 5) (20 5)
+             (22 25) (21 5) (21 24) (21 25) (16 9) (23 9) (23 11) (13 11) (19 9) (19 11) (22 29)
+             (22 9) (24 25) (25 28) (28 29) (28 11)))))
+
 (define (get-degree-renaming graph nb-vertices new-names)
   (let ((vector-graph-nodes-by-degree (get-graph-nodes-by-degrees graph nb-vertices))
         (node-renamings (make-hash)))
@@ -48,13 +74,33 @@
   (check-not-false (member (hash->list (get-degree-renaming '((0 1) (0 2)) 3 (new-name-numeric-generator)))
                            '(((0 . 2) (2 . 1) (1 . 0)) ((0 . 2) (1 . 0) (2 . 1))))))
 
+(define (get-neighbours-min-degree vertex graph forbiddens get-vertex-degree)
+  (define vertex-degree (get-vertex-degree vertex graph))
+  (define neighbours-greater-degree
+    (filter (λ (v) (<= vertex-degree (get-vertex-degree v graph))) (get-neighbours vertex graph forbiddens)))
+  (min&args neighbours-greater-degree (λ (v) (get-vertex-degree v graph))))
 
+(define (vertex<?* graph get-vertex-degree)
+  (λ (v1 v2)
+    (let* ((d1 (get-vertex-degree v1 graph))
+           (d2 (get-vertex-degree v2 graph)))
+      (cond
+        ((< d1 d2) #t)
+        ((< d2 d1) #f)
+        (else
+         (let* ((n1 (get-neighbours-min-degree v1 graph (list v2) get-vertex-degree))
+                (n2 (get-neighbours-min-degree v2 graph (list v1) get-vertex-degree)))
+           (< (car n1) (car n2))))))))
 
-(define (get-neighbours-min-degree vertex graph get-vertex-degree)
-  (define vertex-degree (get-vertex-degree vertex))
-  (define neighbours-greater-degree (filter (λ (v) (<= vertex-degree (get-vertex-degree v)))
-    (get-neighbours vertex graph)))
-  (min&args neighbours-greater-degree get-vertex-degree))
+(module+ test
+  (let*
+      ((G '((0 1) (2 3) (4 5) (6 7) (6 11) (8 9) (10 9) (12 13) (14 13) (14 15) (16 17) (18 15) (0 20) (1 19)
+                  (2 19) (4 20) (8 22) (10 22) (12 21) (16 20) (18 19) (3 23) (5 23) (7 23) (5 27) (7 11)
+                  (24 25) (24 26) (3 21) (24 20) (25 27) (26 27) (28 29) (9 15) (25 13) (27 13) (28 17)
+                  (29 13) (29 15) (29 17) (9 21) (11 21) (11 22) (25 22) (26 21) (26 22) (28 20) (28 21)
+                  (15 17) (17 19) (19 20) (19 22))))
+    (check-equal? (sort (range 30) (vertex<?* G get-degree))
+                  '(0 1 2 4 6 8 10 12 14 16 18 23 3 5 7 24 27 25 26 28 29 9 11 17 15 13 19 20 22 21))))
 
 ; in each edge, the vertices are sorted by their numbers.
 ; if n(v1) < n(v2) then deg(v1) <= deg(v2).

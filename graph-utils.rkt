@@ -9,8 +9,14 @@
    (λ (x acc)
      (let ((value (f x)))
        (cond ((< (car acc) value) acc)
-             ((equal? (car acc) value) (cons (car acc) (cons x (cdr acc))))
-             (else (cons value x)))))))
+             ((equal? (car acc) value) (list (car acc) (cons x (cadr acc))))
+             (else (list value (list x))))))
+   (list +inf.f)
+   xs))
+
+(module+ test
+  (require rackunit)
+  (check-equal? (min&args '(1 2 3 4 1 2 3 4 1) identity) '(1 (1 1 1))))
 
 (define (contains-deep? l x)
   (member x (flatten l)))
@@ -22,7 +28,6 @@
         (else l)))
 
 (module+ test
-  (require rackunit)
   (check-equal? (replace-all-deep 'a 'b '()) '())
   (check-equal? (replace-all-deep 'a 'b 'a) 'b)
   (check-equal? (replace-all-deep 'a 'b 'b) 'b)
@@ -201,12 +206,16 @@
   (car (filter (λ (v) (not (equal? v vertex))) edge)))
 
 (define (edges-having-vertex graph vertex)
-  (filter (λ (edge) (member edge vertex)) graph))
+  (filter (λ (edge) (member vertex edge)) graph))
 
-(define (get-neighbours vertex graph)
-  (map (λ (edge) (edge-other-vertex edge vertex))
-       (edges-having-vertex graph vertex)))
+(module+ test
+  (check-equal? (edges-having-vertex  '((0 3) (0 4) (1 2) (1 3) (1 4) (2 3) (2 4) (3 4)) 3)
+                '((0 3) (1 3) (2 3) (3 4))))
 
+(define (get-neighbours vertex graph forbiddens)
+  (filter (λ (v) (not (member v forbiddens)))
+          (map (λ (edge) (edge-other-vertex edge vertex))
+               (edges-having-vertex graph vertex))))
 
 (define (has-vertex-degree-1 graph)
   (member 1 (flatten (deep (λ (_) (get-degree _ graph)) graph))))

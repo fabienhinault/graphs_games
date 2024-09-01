@@ -5,7 +5,7 @@
 (require "graph-utils.rkt")
 
 (define-for-syntax (compare-to< compare)
-  (λ (_1 _2) (< 0 (compare _1 _2))))
+  (λ (_1 _2) (< (compare _1 _2) 0)))
 
 (define-for-syntax (<to-compare <)
   (λ (_1 _2)
