@@ -386,6 +386,10 @@
              (append edges sub-graph))
            sub-graphs)))
 
+(module+ test
+  (check-equal? (get-edges-subgraphs '((0 1) (0 5))'(2 2 2 2 2 4) 0 '((1 2 3 4) (5)) '((1 2 3 4) (5)) #t #f (set))
+                '()))
+
 ;@defproc[(rec-degrees->graphs [degrees (listof(integer?))] first-vertex all-categories first-vertex-categories)
 ;         (listof(listof integer?))]{
 ;      Returns list of graphs representing unlabelled graphs satisfying the constraints of degrees
@@ -430,6 +434,13 @@
                                          first-already-used new-used-vertices))
                   edgess)))))
 
+
+(module+ test
+  (check-equal? (rec-degrees->graphs '(2 2 2 2 2 4) 0 '((0 1 2 3 4) (5)) '((0 1 2 3 4) (5)) (set))
+                '(((0 1) (0 2) (1 5) (2 5) (3 4) (3 5) (4 5))))
+  (check-equal? (rec-degrees->graphs '(1 2 2 2 3) 1 '((1 2 3 4) (5)) '((1 2 3 4) (5)) (set))
+              '())
+)
 
 (define (first-graph/edges edges degrees first-vertex new-all-categories
                            new-v1-categories first-second-same-category)
