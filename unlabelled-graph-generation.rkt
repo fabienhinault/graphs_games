@@ -354,6 +354,18 @@
   (check-equal? (get-new-new-categories '((1 2 3)) '((0 1) (0 2))) '((1 2) (3)))
   (check-equal? (get-new-new-categories '((1) (2 3)) '((0 1) (0 2))) '((1) (2) (3))))
 
+(define (get-new-new-maxes edges category-nbs new-degrees new-all-categories new-v1-maxes)
+  (define result (map min category-nbs new-v1-maxes))
+  (define new-first-vertex-present  (< 0 (car category-nbs)))
+  (if new-first-vertex-present
+      (cons (- (car result) 1) (cdr result
+      
+
+(define (get-maxes degrees categories)
+  (if (null? degrees)
+      '()
+      (cons (min (car degrees) (length (car categories)))
+            (get-maxes (cdr degrees) (cdr categories)))))
 
 
 (define (filter-out-vertex-from-categories vertex categories)
@@ -366,21 +378,25 @@
   (check-equal? (filter-out-vertex-from-categories 0 '((0 1) (2 3))) '((1) (2 3)))
   (check-equal? (filter-out-vertex-from-categories 1 '((1) (2) (3))) '((2) (3))))
 
-(define (get-edges-subgraphs edges degrees first-vertex new-all-categories
-                             new-v1-categories first-second-same-category
+(define (get-new-v1-maxes first-vertex-maxes first-vertex-categories new-v1-categories)
+  (if (equal? (length first-vertex-categories) (length new-v1-categories))
+      first-vertex-maxes
+      (cdr first-vertex-maxes)))
+
+(define (get-edges-subgraphs edges category-nbs degrees first-vertex new-all-categories
+                             new-v1-categories new-v1-maxes first-second-same-category
                              first-already-used new-used-vertices)
   (define new-degrees (get-new-degrees edges (cdr degrees) first-vertex))
   (define new-new-all-categories (get-new-new-categories new-all-categories edges))
-  (define new-new-v1-categories 
-    (if (and first-second-same-category (not first-already-used))
-        (get-new-new-categories
-         (remove-categories-before-first-joined new-v1-categories edges)
-         edges)
-        new-new-all-categories))
+  (define new-new-v1-maxes
+    (if first-second-same-category
+        (get-new-new-maxes edges category-nbs new-degrees (+ 1 first-vertex) new-all-categories new-v1-maxes)
+        (get-maxes new-degrees new-all-categories)))
   (define sub-graphs (rec-degrees->graphs new-degrees
                                       (+ 1 first-vertex)
                                       new-new-all-categories
-                                      new-new-v1-categories
+                                      new-new-all-categories
+                                      new-new-v1-maxes
                                       new-used-vertices))
   (if (null? sub-graphs)
       '()
@@ -408,7 +424,7 @@
 ; in: used-vertices              set of vertices which are already used in previous edges,
 ; in previous recursions (not present here)
 ; return: list of graphs matching these degrees
-(define (rec-degrees->graphs degrees first-vertex all-categories first-vertex-categories used-vertices)
+(define (rec-degrees->graphs degrees first-vertex all-categories first-vertex-categories first-vertex-maxes used-vertices)
   (define length-degrees (length degrees))
   (cond ((equal? degrees '())
          '());break
@@ -426,15 +442,17 @@
                      (first-already-used (set-member? used-vertices first-vertex))
                      (new-all-categories (filter-out-vertex-from-categories first-vertex all-categories))
                      (new-v1-categories (filter-out-vertex-from-categories first-vertex first-vertex-categories))
+                     (new-v1-maxes (get-new-v1-maxes first-vertex-maxes first-vertex-categories new-v1-categories))
                      (new-used-vertices (set-remove used-vertices first-vertex))
-                     (neighbourss (rec-parts-w/nb-categories new-v1-categories (car degrees)))
+                     (neighbourss (rec-parts-w/nb-max-categories new-v1-categories new-v1-maxes (car degrees)))
+                     (category-nbss (rec-nbss-w/nb-max-categories new-v1-categories new-v1-maxes (car degrees)))
                      (edgess (map (λ (ns) (neighbours->edges first-vertex ns)) neighbourss)))
                  (append-map
-                  (λ (edges)
-                    (get-edges-subgraphs edges degrees first-vertex new-all-categories
+                  (λ (edges category-nbs)
+                    (get-edges-subgraphs edges category-nbs degrees first-vertex new-all-categories
                                          new-v1-categories first-second-same-category
                                          first-already-used new-used-vertices))
-                  edgess)))))
+                  edgess category-nbss)))))
 
 
 (module+ test
