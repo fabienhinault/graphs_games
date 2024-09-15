@@ -287,6 +287,8 @@
   (check-equal? (degreess 6 28 2 5) '((3 5 5 5 5 5) (4 4 5 5 5 5)))
   (check-equal? (degreess 6 30 2 5) '((5 5 5 5 5 5))))
 
+(define (neighbours->edges vertex neighbours)
+  (map (λ (v) (list vertex v)) neighbours))
 
 (define (get-edge-categories vertex vertex-categories)
   (map (λ (v-categorie)
@@ -425,8 +427,8 @@
                      (new-all-categories (filter-out-vertex-from-categories first-vertex all-categories))
                      (new-v1-categories (filter-out-vertex-from-categories first-vertex first-vertex-categories))
                      (new-used-vertices (set-remove used-vertices first-vertex))
-                     (edge-categories (get-edge-categories first-vertex new-v1-categories))
-                     (edgess (rec-parts-w/nb-categories edge-categories (car degrees))))
+                     (neighbourss (rec-parts-w/nb-categories new-v1-categories (car degrees)))
+                     (edgess (map (λ (ns) (neighbours->edges first-vertex ns)) neighbourss)))
                  (append-map
                   (λ (edges)
                     (get-edges-subgraphs edges degrees first-vertex new-all-categories

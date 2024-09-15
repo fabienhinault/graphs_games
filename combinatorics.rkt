@@ -109,6 +109,34 @@
   (check-equal? (rec-parts-w/nb '(0 1 2 3) 3) '((0 1 2) (0 1 3) (0 2 3) (1 2 3)))
   (check-equal? (rec-parts-w/nb '(0 1 2 3) 4) '((0 1 2 3))))
 
+; partitions of (apply append categories) having nb elements,
+; always taking the first elements in each category
+; not more than the max number given by maxes
+; not more than (list-ref maxes i) in category (list-ref categories i)
+(define (rec-parts-w/nb-max-categories categories maxes nb)
+  (cond ((null? categories)
+         '())
+        ((equal? 0 nb)
+         '(()))
+        ((or (null? (car categories)) (equal? 0 (car maxes)))
+         (rec-parts-w/nb-max-categories (cdr categories) (cdr maxes) nb))
+        (else
+         ; since we only take the first elements of each category,
+         ; in (car categories) we only take (caar categories).
+         ; so the results the append of
+         ; - the parts beginning with (caar categories) and
+         ; - the parts not containing (car categories)
+         (append
+          (map (λ (_) (cons (caar categories) _))
+               (rec-parts-w/nb-max-categories (cons (cdar categories) (cdr categories))
+                                              (cons (- (car maxes) 1) (cdr maxes))
+                                              (- nb 1)))
+          (rec-parts-w/nb-max-categories (cdr categories) (cdr maxes) nb)))))
+
+(module+ test
+  (check-equal? (rec-parts-w/nb-max-categories '((2 3 4) (5)) '(0 1) 1) '((5)))
+  )
+
 
 ; partitions of (apply append categories) having nb elements,
 ; always taking the first elements in each category
@@ -162,6 +190,8 @@
   (check-equal? (rec-parts-w/nb-categories '((0 1) (2 3)) 3) '((0 1 2) (0 2 3)))
   (check-equal? (rec-parts-w/nb-categories '((0 1 2 3)) 4) '((0 1 2 3)))
   (check-equal? (rec-parts-w/nb-categories '((0 1) (2 3)) 4) '((0 1 2 3)))
+  (check-equal? (rec-parts-w/nb-categories '((2 3 4) (5))  1) '((2) (5)))
+  ; tests on edges
   (check-equal? (rec-parts-w/nb-categories '(([0 1]) ([0 2] [0 3])) 2) '(([0 1] [0 2]) ([0 2] [0 3])))
   (check-equal? (rec-parts-w/nb-categories '(([1 2]) ([1 3])) 1) '(([1 2]) ([1 3]))))
 
