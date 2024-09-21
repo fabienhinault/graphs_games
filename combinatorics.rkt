@@ -501,6 +501,8 @@
  tailrec-parts
  parts-w/nb
  rec-parts-w/nb-categories
+ rec-parts-w/nb-max-categories
+ rec-nbss-w/nb-max-categories
  rec-parts-w/nb-categories-stream
  next-part/nb-categories
  first-part/nb-categories)
