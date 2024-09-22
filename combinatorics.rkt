@@ -116,9 +116,9 @@
 (define (rec-parts-w/nb-max-categories categories maxes nb)
   (cond ((null? categories)
          '())
-        ((equal? 0 nb)
+        ((= 0 nb)
          '(()))
-        ((or (null? (car categories)) (equal? 0 (car maxes)))
+        ((or (null? (car categories)) (= 0 (car maxes)))
          (rec-parts-w/nb-max-categories (cdr categories) (cdr maxes) nb))
         (else
          ; since we only take the first elements of each category,
@@ -135,6 +135,7 @@
 
 (module+ test
   (check-equal? (rec-parts-w/nb-max-categories '((2 3 4) (5)) '(0 1) 1) '((5)))
+  (check-equal? (rec-parts-w/nb-max-categories '((2 3 4) (5)) '(0.0 +inf.0) 1) '((5)))
   )
 
 ; buddy function of rec-parts-w/nb-max-categories
@@ -143,9 +144,9 @@
 (define (rec-nbss-w/nb-max-categories categories maxes nb)
   (cond ((null? categories)
          '())
-        ((equal? 0 nb)
+        ((= 0 nb)
          (list (map (λ (c) 0) categories)))
-        ((or (null? (car categories)) (equal? 0 (car maxes)))
+        ((or (null? (car categories)) (= 0 (car maxes)))
          (map (λ (nbs) (cons 0 nbs))
               (rec-nbss-w/nb-max-categories (cdr categories) (cdr maxes) nb)))
         (else
@@ -195,7 +196,8 @@
   (check-equal? (rec-nbss-w/nb-max-categories '((0 1) (2 3)) '(2 2) 3) '((2 1) (1 2)))
   (check-equal? (rec-nbss-w/nb-max-categories '((0 1 2 3)) '(4) 4) '((4)))
   (check-equal? (rec-nbss-w/nb-max-categories '((0 1) (2 3)) '(2 2) 4) '((2 2)))
-  (check-equal? (rec-nbss-w/nb-max-categories '((2 3 4) (5)) '(1 1) 1) '((1 0) (0 1))))
+  (check-equal? (rec-nbss-w/nb-max-categories '((2 3 4) (5)) '(1 1) 1) '((1 0) (0 1)))
+  (check-equal? (rec-nbss-w/nb-max-categories '((2 3 4) (5)) '(0.0 +inf.0) 1) '((0 1))))
 
 ; partitions of (apply append categories) having nb elements,
 ; always taking the first elements in each category
