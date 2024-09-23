@@ -322,6 +322,127 @@
   (check-equal? (first-part/nb-categories '(([0 1]) ([0 2] [0 3])) 2) '([0 1] [0 2]))
   (check-equal? (first-part/nb-categories '(([1 2]) ([1 3])) 1) '([1 2])))
 
+
+; first partition of (apply append categories) having nb elements,
+; always taking the first elements in each category, not more than the max in maxes
+(define (first-part/nb-max-categories categories maxes nb)
+    (cond ((= 0 nb)
+           '())
+          ((null? categories)
+           #f)
+          ((or (null? (car categories)) (= 0 (car maxes)))
+           (first-part/nb-max-categories (cdr categories) (cdr maxes) nb))
+          (else
+           (let ((sub (first-part/nb-max-categories
+                       (cons (cdar categories) (cdr categories))
+                       (cons (- (car maxes) 1) (cdr maxes))
+                       (- nb 1))))
+             (if sub
+                 (cons (caar categories) sub)
+                 (first-part/nb-max-categories (cdr categories) (cdr maxes) nb))))))
+(module+ test
+  (check-equal? (first-part/nb-max-categories '((0)) '(+inf.0) 0) '())
+  (check-equal? (first-part/nb-max-categories '(()) '(+inf.0) 0) '())
+  (check-equal? (first-part/nb-max-categories '((0)) '(+inf.0) 1) '(0))
+  (check-equal? (first-part/nb-max-categories '((0)) '(+inf.0) 2) #f)
+  (check-equal? (first-part/nb-max-categories '((0 1)) '(+inf.0) 1) '(0))
+  (check-equal? (first-part/nb-max-categories '(() (1)) '(+inf.0 +inf.0) 0) '())
+  (check-equal? (first-part/nb-max-categories '((0) (1)) '(+inf.0 +inf.0) 1) '(0))
+  (check-equal? (first-part/nb-max-categories '((0 1)) '(+inf.0) 2) '(0 1))
+  (check-equal? (first-part/nb-max-categories '((0) (1)) '(+inf.0 +inf.0) 2) '(0 1))
+  (check-equal? (first-part/nb-max-categories '((0 1 2)) '(+inf.0) 1) '(0))
+  (check-equal? (first-part/nb-max-categories '((0) (1 2)) '(+inf.0 +inf.0) 1) '(0))
+  (check-equal? (first-part/nb-max-categories '((0) (1 2)) '(+inf.0 +inf.0) 2) '(0 1))
+  (check-equal? (first-part/nb-max-categories '((0 1) (2)) '(+inf.0 +inf.0) 1) '(0))
+  (check-equal? (first-part/nb-max-categories '((0) (1) (2)) '(+inf.0 +inf.0 +inf.0) 1) '(0))
+  (check-equal? (first-part/nb-max-categories '((0 1 2)) '(+inf.0) 2) '(0 1))
+  (check-equal? (first-part/nb-max-categories '((0) (1) (2)) '(+inf.0 +inf.0 +inf.0) 2) '(0 1))
+  (check-equal? (first-part/nb-max-categories '((0 1 2)) '(+inf.0) 3) '(0 1 2))
+  (check-equal? (first-part/nb-max-categories '((0 1 2 3)) '(+inf.0) 1) '(0))
+  (check-equal? (first-part/nb-max-categories '((0) (1 2 3)) '(+inf.0 +inf.0) 1) '(0))
+  (check-equal? (first-part/nb-max-categories '((0 1) (2 3)) '(+inf.0 +inf.0) 1) '(0))
+  (check-equal? (first-part/nb-max-categories '((0 1 2) (3)) '(+inf.0 +inf.0) 1) '(0))
+  (check-equal? (first-part/nb-max-categories '((0 1 2 3)) '(+inf.0) 2) '(0 1))
+  (check-equal? (first-part/nb-max-categories '((0) (1 2 3)) '(+inf.0 +inf.0) 2) '(0 1))
+  (check-equal? (first-part/nb-max-categories '((0 1) (2 3)) '(+inf.0 +inf.0) 2) '(0 1))
+  (check-equal? (first-part/nb-max-categories '((0 1 2) (3)) '(+inf.0 +inf.0) 2) '(0 1))
+  (check-equal? (first-part/nb-max-categories '((0) (1 2 3)) '(1.0 +inf.0) 2) '(0 1))
+  (check-equal? (first-part/nb-max-categories '((0 1) (2 3)) '(1.0 +inf.0) 2) '(0 2))
+  (check-equal? (first-part/nb-max-categories '((0 1 2) (3)) '(1.0 +inf.0) 2) '(0 3))
+  (check-equal? (first-part/nb-max-categories '((0 1 2 3)) '(+inf.0) 3) '(0 1 2))
+  (check-equal? (first-part/nb-max-categories '((0) (1 2 3)) '(+inf.0 +inf.0) 3) '(0 1 2))
+  (check-equal? (first-part/nb-max-categories '((0 1) (2 3)) '(+inf.0 +inf.0) 3) '(0 1 2))
+  (check-equal? (first-part/nb-max-categories '((0 1 2 3)) '(+inf.0) 4) '(0 1 2 3))
+  (check-equal? (first-part/nb-max-categories '((0 1) (2 3)) '(+inf.0 +inf.0) 4) '(0 1 2 3)))
+
+; next partition of (apply append categories) having nb elements,
+; always taking the first elements in each category, not more than the max in maxes
+(define (next-part/nb-max-categories categories maxes nb part)
+    (cond ((equal? 0 nb)
+           #f) ; no next, as '() is the only part with 0 elements
+          ((null? categories)
+           #f)
+          ((or (null? (car categories)) (= 0 (car maxes)))
+           (next-part/nb-max-categories (cdr categories) (cdr maxes) nb part))
+          ((equal? (car part) (caar categories))
+               (let ((sub (next-part/nb-max-categories
+                           (cons (cdar categories) (cdr categories))
+                           (cons (- (car maxes) 1) (cdr maxes))
+                           (- nb 1)
+                           (cdr part))))
+                 (if sub
+                     (cons (car part) sub)
+                     (first-part/nb-max-categories (cdr categories) (cdr maxes) nb))))
+          (else
+           (next-part/nb-max-categories (cdr categories) (cdr maxes) nb part))))
+
+(module+ test
+  (check-equal? (next-part/nb-max-categories '((0)) '(+inf.0) 0 '()) #f)
+  (check-equal? (next-part/nb-max-categories '(()) '(+inf.0) 0 '()) #f)
+  (check-equal? (next-part/nb-max-categories '() '() 1 '()) #f)
+  (check-equal? (next-part/nb-max-categories '((0)) '(+inf.0) 1 '(0)) #f)
+  (check-equal? (next-part/nb-max-categories '((0 1)) '(+inf.0) 1 '(0)) #f)
+  (check-equal? (next-part/nb-max-categories '(() (1)) '(+inf.0 +inf.0) 0 '()) #f)
+  (check-equal? (next-part/nb-max-categories '((0) (1)) '(+inf.0 +inf.0) 1 '(0)) '(1))
+  (check-equal? (next-part/nb-max-categories '((0) (1)) '(+inf.0 +inf.0) 1 '(1)) #f)
+  (check-equal? (next-part/nb-max-categories '((0 1)) '(+inf.0) 2 '(0 1)) #f)
+  (check-equal? (next-part/nb-max-categories '((0) (1)) '(+inf.0 +inf.0) 2 '(0 1)) #f)
+  (check-equal? (next-part/nb-max-categories '((0 1 2)) '(+inf.0) 1 '(0)) #f)
+  (check-equal? (next-part/nb-max-categories '((0) (1 2)) '(+inf.0 +inf.0) 1 '(0)) '(1))
+  (check-equal? (next-part/nb-max-categories '((0) (1 2)) '(+inf.0 +inf.0) 1 '(1)) #f)
+  (check-equal? (next-part/nb-max-categories '((0) (1 2)) '(+inf.0 +inf.0) 2 '(0 1)) '(1 2))
+  (check-equal? (next-part/nb-max-categories '((0) (1 2)) '(+inf.0 +inf.0) 2 '(1 2)) #f)
+  (check-equal? (next-part/nb-max-categories '((0 1) (2)) '(+inf.0 +inf.0) 1 '(0)) '(2))
+  (check-equal? (next-part/nb-max-categories '((0 1) (2)) '(+inf.0 +inf.0) 1 '(2)) #f)
+  (check-equal? (next-part/nb-max-categories '((0) (1) (2)) '(+inf.0 +inf.0 +inf.0) 1 '(0)) '(1))
+  (check-equal? (next-part/nb-max-categories '((0) (1) (2)) '(+inf.0 +inf.0 +inf.0) 1 '(1)) '(2))
+  (check-equal? (next-part/nb-max-categories '((0) (1) (2)) '(+inf.0 +inf.0 +inf.0) 1 '(2)) #f)
+  (check-equal? (next-part/nb-max-categories '((0 1 2)) '(+inf.0) 2 '(0 1)) #f)
+  (check-equal? (next-part/nb-max-categories '((0) (1) (2)) '(+inf.0 +inf.0 +inf.0) 2 '(0 1)) '(0 2))
+  (check-equal? (next-part/nb-max-categories '((0) (1) (2)) '(+inf.0 +inf.0 +inf.0) 2 '(0 2)) '(1 2))
+  (check-equal? (next-part/nb-max-categories '((0) (1) (2)) '(+inf.0 +inf.0 +inf.0) 2 '(1 2)) #f)
+  (check-equal? (next-part/nb-max-categories '((0 1 2)) '(+inf.0) 3 '(0 1 2)) #f)
+  (check-equal? (next-part/nb-max-categories '((0 1 2 3)) '(+inf.0) 1 '(0)) #f)
+  (check-equal? (next-part/nb-max-categories '((0) (1 2 3)) '(+inf.0 +inf.0) 1 '(0)) '(1))
+  (check-equal? (next-part/nb-max-categories '((0) (1 2 3)) '(+inf.0 +inf.0) 1 '(1)) #f)
+  (check-equal? (next-part/nb-max-categories '((0 1) (2 3)) '(+inf.0 +inf.0) 1 '(0)) '(2))
+  (check-equal? (next-part/nb-max-categories '((0 1 2) (3)) '(+inf.0 +inf.0) 1 '(0)) '(3))
+  (check-equal? (next-part/nb-max-categories '((0 1 2 3)) '(+inf.0) 2 '(0 1)) #f)
+  (check-equal? (next-part/nb-max-categories '((0) (1 2 3)) '(+inf.0 +inf.0) 2 '(0 1)) '(1 2))
+  (check-equal? (next-part/nb-max-categories '((0) (1 2 3)) '(+inf.0 +inf.0) 2 '(1 2)) #f)
+  (check-equal? (next-part/nb-max-categories '((0 1) (2 3)) '(+inf.0 +inf.0) 2 '(0 1)) '(0 2))
+  (check-equal? (next-part/nb-max-categories '((0 1) (2 3)) '(+inf.0 +inf.0) 2 '(0 2)) '(2 3))
+  (check-equal? (next-part/nb-max-categories '((0 1) (2 3)) '(+inf.0 +inf.0) 2 '(2 3)) #f)
+  (check-equal? (next-part/nb-max-categories '((0 1 2) (3)) '(+inf.0 +inf.0) 2 '(0 1)) '(0 3))
+  (check-equal? (next-part/nb-max-categories '((0 1 2) (3)) '(+inf.0 +inf.0) 2 '(0 3)) #f)
+  (check-equal? (next-part/nb-max-categories '((0 1 2 3)) '(+inf.0) 3 '(0 1 2)) #f)
+  (check-equal? (next-part/nb-max-categories '((0) (1 2 3)) '(+inf.0 +inf.0) 3 '(0 1 2)) '(1 2 3))
+  (check-equal? (next-part/nb-max-categories '((0) (1 2 3)) '(+inf.0 +inf.0) 3 '(1 2 3)) #f)
+  (check-equal? (next-part/nb-max-categories '((0 1) (2 3)) '(+inf.0 +inf.0) 3 '(0 1 2)) '(0 2 3))
+  (check-equal? (next-part/nb-max-categories '((0 1) (2 3)) '(+inf.0 +inf.0) 3 '(0 2 3)) #f)
+  (check-equal? (next-part/nb-max-categories '((0 1 2 3)) '(+inf.0) 4 '(0 1 2 3)) #f)
+  (check-equal? (next-part/nb-max-categories '((0 1) (2 3)) '(+inf.0 +inf.0) 4 '(0 1 2 3)) #f))
+
 ; next partition of (apply append categories) having nb elements,
 ; always taking the first elements in each category
 (define (next-part/nb-categories categories nb part)
@@ -390,6 +511,11 @@
   (check-equal? (next-part/nb-categories '(([0 1]) ([0 2] [0 3])) 2 '([0 2] [0 3])) #f)
   (check-equal? (next-part/nb-categories '(([1 2]) ([1 3])) 1 '([1 2])) '([1 3]))
   (check-equal? (next-part/nb-categories '(([1 2]) ([1 3])) 1 '([1 3])) #f))
+
+(define (part->nbs part categories)
+  (define part-set (list->set part))
+  (map (λ (cat) (set-count (set-intersect (list->set cat) part-set))
+       categories)))
 
 (define (tailrec-parts-update-result tmp-res x)
     (append
@@ -507,4 +633,7 @@
  rec-nbss-w/nb-max-categories
  rec-parts-w/nb-categories-stream
  next-part/nb-categories
- first-part/nb-categories)
+ next-part/nb-max-categories
+ first-part/nb-categories
+ first-part/nb-max-categories
+ part->nbs)

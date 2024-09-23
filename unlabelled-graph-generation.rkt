@@ -327,8 +327,8 @@
 
 
 
-(define (get-nbs-categories category-nbs new-v1-categories)
-  (define maxes (nbs->maxes category-nbs))
+(define (get-nbs-categories category-nbs new-v1-categories filled-slot)
+  (define maxes (nbs->maxes category-nbs filled-slot))
   (map (λ (cat new-max) (category (category-vertices cat)
                                   (min new-max (category-max cat))))
        new-v1-categories
@@ -336,10 +336,12 @@
 
 
 (module+ test
-  (check-equal? (get-nbs-categories  '(1 1) '(#s(category (1 2 3 4) +inf.0) #s(category (5) +inf.0)))
+  (check-equal? (get-nbs-categories  '(1 1) '(#s(category (1 2 3 4) +inf.0) #s(category (5) +inf.0)) 0)
                                      '(#s(category (1 2 3 4) 1.0) #s(category (5) +inf.0)))
-  (check-equal? (get-nbs-categories  '(2 0) '(#s(category (1 2 3 4) +inf.0) #s(category (5) +inf.0)))
-                                     '(#s(category (1 2 3 4) +inf.0) #s(category (5) +inf.0))))
+  (check-equal? (get-nbs-categories  '(2 0) '(#s(category (1 2 3 4) +inf.0) #s(category (5) +inf.0)) 0)
+                                     '(#s(category (1 2 3 4) +inf.0) #s(category (5) +inf.0)))
+  (check-equal? (get-nbs-categories  '(0 1) '(#s(category (2 3 4) +inf.0) #s(category (5) +inf.0)) 1)
+                                     '(#s(category (2 3 4) 1.0) #s(category (5) +inf.0))))
 
 ; return the categories after the one of the first edge in edges
 ; in the recursive process of degrees->graphs
@@ -374,30 +376,9 @@
   (check-equal? (category-split '(1 2) (category '(2 3) +inf.0))
                 (list (category '(2) +inf.0) (category '(3) +inf.0))))
 
-
-
-; split categories if some vertices are touched by edges
-(define (get-new-new-categories new-categories edges)
-  (let ((vertices  (map cadr edges)))
-            (append* (map (λ (cat) (category-split vertices cat))
-                          new-categories))))
-
-(module+ test
-  (check-equal? (get-new-new-categories '(#s(category (1 2 3) +inf.0)) '((0 1) (0 2)))
-                '(#s(category (1 2) +inf.0) #s(category (3) +inf.0)))
-  (check-equal? (get-new-new-categories '(#s(category (1) +inf.0) #s(category (2 3) +inf.0)) '((0 1) (0 2)))
-                '(#s(category (1) +inf.0) #s(category (2) +inf.0) #s(category (3) +inf.0)))
-  (check-equal? (get-new-new-categories '(#s(category (1 2 3 4) +inf.0) #s(category (5) +inf.0))
-                                        '((0 1) (0 5)))
-                '(#s(category (1) +inf.0) #s(category (2 3 4) +inf.0) #s(category (5) +inf.0)))
-  (check-equal? (get-new-new-categories '(#s(category (1 2 3 4) 1.0) #s(category (5) +inf.0))
-                                        '((0 1) (0 5)))
-                '(#s(category (1) 1.0) #s(category (2 3 4) 1.0) #s(category (5) +inf.0))))
-                                     
-
-
-(define (nbs->maxes nbs)
-  (reverse (rnbs->rmaxes (reverse nbs))))
+(define (nbs->maxes nbs filled-slot)
+  (define nbs/slot (cons (+ filled-slot (car nbs)) (cdr nbs)))
+  (reverse (rnbs->rmaxes (reverse nbs/slot))))
 
 (define (rnbs->rmaxes rnbs)
   (cond ((null? rnbs)
@@ -406,19 +387,6 @@
          (cons +inf.0 (rnbs->rmaxes (cdr rnbs))))
         (else
          (cons +inf.0 (cdr rnbs)))))
-
-(define (get-new-new-maxes edges category-nbs new-degrees new-all-categories new-v1-maxes)
-  (define result (map min (nbs->maxes category-nbs) new-v1-maxes))
-  (define new-first-vertex-present  (< 0 (car category-nbs)))
-  (if new-first-vertex-present
-      (cons (- (car result) 1) (cdr result))
-      result))
-
-;(define (get-maxes degrees categories)
-;  (if (null? degrees)
-;      '()
-;      (cons (min (car degrees) (length (car categories)))
-;            (get-maxes (cdr degrees) (cdr categories)))))
 
 (define (category-filter-out-vertex cat vertex)
   (category (filter-not (λ (v) (equal? v vertex)) (category-vertices cat))
@@ -439,7 +407,10 @@
                 '(#s(category (1) +inf.0) #s(category (2 3) +inf.0)))
   (check-equal? (filter-out-vertex-from-categories
                  1 '(#s(category (1) +inf.0) #s(category (2) +inf.0) #s(category (3) +inf.0)))
-                '(#s(category (2) +inf.0) #s(category (3) +inf.0))))
+                '(#s(category (2) +inf.0) #s(category (3) +inf.0)))
+  
+  (check-equal? (filter-out-vertex-from-categories 0 '(#s(category (0 1) +inf.0)))
+                '(#s(category (1) +inf.0))))
 
 (define (get-new-v1-maxes first-vertex-maxes first-vertex-categories new-v1-categories)
   (if (equal? (length first-vertex-categories) (length new-v1-categories))
@@ -474,7 +445,7 @@
   (define new-degrees (get-new-degrees edges (cdr degrees) first-vertex))
   (define new-new-v1-categories 
     (if first-second-same-category
-        (get-nbs-categories category-nbs new-v1-categories)
+        (get-nbs-categories category-nbs new-v1-categories (car filled-slots))
         new-all-categories))
   (define new-filled-slots
     (if (not first-second-same-category)
@@ -496,7 +467,17 @@
                                      '(#s(category (1 2 3 4) +inf.0) #s(category (5) +inf.0))
                                      '(#s(category (1 2 3 4) +inf.0) #s(category (5) +inf.0))
                                      #t '(0 0 0 0 0))
-                '((1 5) (2 5) (3 4) (3 5) (4 5)))
+                '(((0 1) (0 2) (1 5) (2 5) (3 4) (3 5) (4 5))))
+  (check-equal? (get-edges-subgraphs '((1 5)) '(0 1) '(1 1 2 2 4) 1
+                                     '(#s(category (2 3 4) +inf.0) #s(category (5) +inf.0))
+                                     '(#s(category (2 3 4) +inf.0) #s(category (5) +inf.0))
+                                     #t '(1 1 0 0))
+                '(((1 5) (2 5) (3 4) (3 5) (4 5))))
+  (check-equal? (get-edges-subgraphs '((2 5)) '(0 1) '(1 2 2 3) 2
+                                     '(#s(category (3 4) +inf.0) #s(category (5) +inf.0))
+                                     '(#s(category (3 4) +inf.0) #s(category (5) +inf.0))
+                                     #t '(1 0 0))
+                '(((2 5) (3 4) (3 5) (4 5))))
   ; there should be no graph beginning with '((0 1) (0 5)), because other vertices of degree 2
   ; should not edge to more than one other degree-2-vertex.
   (check-equal? (get-edges-subgraphs '((0 1) (0 5)) '(1 1) '(2 2 2 2 2 4) 0
@@ -513,21 +494,30 @@
 
 (module+ test
   (check-equal? (get-maxes '(#s(category (2 3 4) 1.0) #s(category (5) +inf.0)) 1)
-                '(0.0 +inf.0)))
+                '(0.0 +inf.0))
+  (check-equal? (get-maxes '(#s(category (2 3 4)  +inf.0) #s(category (5) +inf.0)) 1)
+                '(+inf.0 +inf.0)))
 
 
 (define (parts categories nb filled-slot)
   (rec-parts-w/nb-max-categories (map category-vertices categories)
                                  (get-maxes categories filled-slot) nb))
+
 (module+ test
   (check-equal? (parts '(#s(category (2 3 4) 1.0) #s(category (5) +inf.0)) 1 1)
-                '((5))))
+                '((5)))
+  (check-equal? (parts '(#s(category (2 3 4) +inf.0) #s(category (5) +inf.0)) 1 1)
+                '((2) (5))))
 
-
-                 
 (define (nbss categories nb filled-slot)
   (rec-nbss-w/nb-max-categories (map category-vertices categories)
                                 (get-maxes categories filled-slot) nb))
+
+(module+ test
+  (check-equal? (nbss '(#s(category (2 3 4) 1.0) #s(category (5) +inf.0)) 1 1)
+                '((0 1)))
+  (check-equal? (nbss '(#s(category (2 3 4) +inf.0) #s(category (5) +inf.0)) 1 1)
+                '((1 0) (0 1))))
 
 ;@defproc[(rec-degrees->graphs [degrees (listof(integer?))] first-vertex all-categories first-vertex-categories)
 ;         (listof(listof integer?))]{
@@ -591,301 +581,24 @@
                                      '(#s(category (1 2 3 4) 1.0) #s(category (5) +inf.0))
                                      '(1 0 0 0))
               '())
-)
+  )
 
-(define (first-graph/edges edges degrees first-vertex new-all-categories
-                           new-v1-categories first-second-same-category)
-  (define new-degrees (get-new-degrees edges (cdr degrees) first-vertex))
-  (define new-new-all-categories (get-new-new-categories new-all-categories edges))
-  (define new-new-v1-categories 
-    (if first-second-same-category
-        (get-new-new-categories
-         (remove-categories-before-first-joined new-v1-categories edges)
-         edges)
-        new-new-all-categories))
-  (define subgraph (first-graph  new-degrees (+ 1 first-vertex) new-new-all-categories
-                          new-new-v1-categories))
-  (if subgraph
-      (append edges subgraph)
-      (let* ((edge-categories (get-edge-categories first-vertex new-v1-categories))
-             (next-edges (next-part/nb-categories edge-categories (car degrees) edges)))
-        (if next-edges
-            (first-graph/edges next-edges degrees first-vertex new-all-categories
-                               new-v1-categories first-second-same-category)
-            #f))))
-
-(define (first-graph degrees first-vertex all-categories first-vertex-categories)
-  (define length-degrees (length degrees))
-  (cond
-    ((equal? degrees '()) #f)
-    ((equal? degrees '(0)) '())
-    ((and (equal? 0 (car degrees)) (memf (λ (deg) (> deg 0)) degrees))
-     #f) ; break as leading to disconnected graphs
-    ((null? (car all-categories))
-     (first-graph degrees first-vertex (cdr all-categories) first-vertex-categories))
-    ((null? (car first-vertex-categories))
-     (first-graph degrees first-vertex all-categories (cdr first-vertex-categories)))
-    ((memf (λ (deg) (>= deg length-degrees)) degrees)
-     #f);break
-    (else
-     (let* ((first-second-same-category (member (+ 1 first-vertex) (car all-categories)))
-            (new-all-categories (filter-out-vertex-from-categories first-vertex all-categories))
-            (new-v1-categories (filter-out-vertex-from-categories first-vertex first-vertex-categories))
-            (edge-categories (get-edge-categories first-vertex new-v1-categories))
-            (edges (first-part/nb-categories edge-categories (car degrees))))
-       (if edges
-           (first-graph/edges edges degrees first-vertex new-all-categories
-                              new-v1-categories first-second-same-category)
-           #f)))))
-
-
-(module+ test
-  (check-equal? (first-graph '(0 2) 3 '((4)) '((4))) #f)
-  (check-equal? (first-graph '(0) 1 '((1)) '((1))) '())
-  (check-equal? (first-graph '(1 1) 0 '((0 1)) '((0 1))) '((0 1))) ; 0--1
-  (check-equal? (first-graph '(0) 3 '((3)) '((3))) '())
-  (check-equal? (first-graph '(1 1) 2 '((2 3)) '((2 3))) '((2 3)))
-  (check-equal? (first-graph '(2) 3 '((3)) '((3))) #f)
-  (check-equal? (first-graph '(1 3) 2 '((2) (3)) '((2) (3))) #f)
-  (check-equal? (first-graph '(1 2 3) 1 '((1) (2) (3)) '((1) (2) (3))) #f)
-  (check-equal? (first-graph '(2 2 3 3) 0 '((0 1) (2 3)) '((0 1) (2 3))) '((0 2) (0 3) (1 2) (1 3) (2 3)))
-  (check-equal? (first-graph '(1) 4 '((4)) '((4))) #f)
-  (check-equal? (first-graph '(0 2) 3 '((4)) '((4))) #f)
-  (check-equal? (first-graph '(2 1 3) 2 '((2) (3) (4)) '((2) (3) (4))) #f)
-  (check-equal? (first-graph '(1 2 3) 2 '((2) (3) (4)) '((2) (3) (4))) #f)
-  (check-equal? (first-graph '(2 2 2) 2 '((2 3) (4)) '((4))) #f)
-  (check-equal? (first-graph '(1 2 2 3) 1 '((1) (2) (3) (4)) '((1) (2) (3) (4))) '{(1 4) (2 3) (2 4) (3 4)})
-  (check-equal? (first-graph '(1 2 2 3) 1 '((1) (2 3) (4)) '((1) (2 3) (4))) '{(1 4) (2 3) (2 4) (3 4)})
-  (check-equal? (first-graph '(1 1 3 3) 1 '((1 2) (3 4)) '((1 2) (3 4))) #f)
-  (check-equal? (first-graph '(2 2 2 3 3) 0 '((0 1 2) (3 4)) '((0 1 2) (3 4)))
-                '((0 1) (0 3) (1 4) (2 3) (2 4) (3 4)))
-  (check-equal? (first-graph '(2 2 2 2 2) 0 '((0 1 2 3 4)) '((0 1 2 3 4)))
-                '((0 1) (0 2) (1 3) (2 4) (3 4)))
-  (check-equal? (first-graph '(2 2 2 2 4) 0 '((0 1 2 3) (4)) '((0 1 2 3) (4)))
-                '((0 1) (0 4) (1 4) (2 3) (2 4) (3 4)))
-  (check-equal? (first-graph '(2 2 2 4 4) 0 '((0 1 2) (3 4)) '((0 1 2) (3 4)))
-                '((0 3) (0 4) (1 3) (1 4) (2 3) (2 4) (3 4)))
-  (check-equal? (first-graph '(2 2 3 3 4) 0 '((0 1) (2 3) (4)) '((0 1) (2 3) (4)))
-                '((0 2) (0 4) (1 3) (1 4) (2 3) (2 4) (3 4)))
-  (check-equal? (first-graph '(2 3 3 3 3) 0 '((0) (1 2 3 4)) '((0) (1 2 3 4)))
-                '((0 1) (0 2) (1 3) (1 4) (2 3) (2 4) (3 4)))
-  (check-equal? (first-graph '(2 2 4 4 4) 0 '((0 1) (2 3 4)) '((0 1) (2 3 4)))
-                #f)
-  (check-equal? (first-graph '(2 3 3 4 4) 0 '((0) (1 2) (3 4)) '((0) (1 2) (3 4)))
-                '((0 3) (0 4) (1 2) (1 3) (1 4) (2 3) (2 4) (3 4)))
-  (check-equal? (first-graph '(3 3 3 3 4) 0 '((0 1 2 3) (4)) '((0 1 2 3) (4)))
-                '((0 1) (0 2) (0 4) (1 3) (1 4) (2 3) (2 4) (3 4)))
-  (check-equal? (first-graph '(2 2 2 2 2 2) 0 '((0 1 2 3 4 5)) '((0 1 2 3 4 5)))
-                '((0 1) (0 2) (1 3) (2 4) (3 5) (4 5))))
-
-
-(define (next-graph/edges edges subgraph degrees first-vertex new-all-categories new-v1-categories
-                          first-second-same-category)
-  (define new-degrees (get-new-degrees edges (cdr degrees) first-vertex))
-  (define new-new-all-categories (get-new-new-categories new-all-categories edges))
-  (define new-new-v1-categories 
-    (if first-second-same-category
-        (get-new-new-categories
-         (remove-categories-before-first-joined new-v1-categories edges)
-         edges)
-        new-new-all-categories))
-  (define next-subgraph (next-graph subgraph new-degrees (+ 1 first-vertex) new-new-all-categories
-                          new-new-v1-categories))
-  (if next-subgraph
-      (append edges next-subgraph)
-      (let* ((edge-categories (get-edge-categories first-vertex new-v1-categories))
-             (next-edges (next-part/nb-categories edge-categories (car degrees) edges)))
-        (if next-edges
-            (first-graph/edges next-edges degrees first-vertex new-all-categories
-                               new-v1-categories first-second-same-category)
-            #f))))
-
-(define (next-graph graph degrees first-vertex all-categories first-vertex-categories)
-  (define length-degrees (length degrees))
-  (cond
-    ((equal? degrees '()) #f)
-    ((equal? degrees '(0)) #f) ; '() was returned as first graph, no next
-    ((and (equal? 0 (car degrees)) (memf (λ (deg) (> deg 0)) degrees))
-     #f) ; break as leading to disconnected graphs
-    ((null? (car all-categories))
-     (next-graph graph degrees first-vertex (cdr all-categories) first-vertex-categories))
-    ((null? (car first-vertex-categories))
-     (next-graph graph degrees first-vertex all-categories (cdr first-vertex-categories)))
-    ((memf (λ (deg) (>= deg length-degrees)) degrees)
-     #f);break
-    (else
-     (let-values (((edges subgraph) (splitf-at graph (λ (edge) (equal? (car edge) first-vertex)))))
-       (let* ((first-second-same-category (member (+ 1 first-vertex) (car all-categories)))
-              (new-all-categories (filter-out-vertex-from-categories first-vertex all-categories))
-              (new-v1-categories (filter-out-vertex-from-categories first-vertex first-vertex-categories)))
-         (next-graph/edges edges subgraph degrees first-vertex new-all-categories new-v1-categories
-                           first-second-same-category))))))
-
-
-(module+ test
-  (check-equal? (next-graph '() '(0) 1 '((1)) '((1))) #f)
-  (check-equal? (next-graph '((0 1)) '(1 1) 0 '((0 1)) '((0 1))) #f) ; 0--1
-  (check-equal? (next-graph '() '(0) 3 '((3)) '((3))) #f)
-  (check-equal? (next-graph '((2 3)) '(1 1) 2 '((2 3)) '((2 3))) #f)
-  (check-equal? (next-graph '((0 2) (0 3) (1 2) (1 3) (2 3)) '(2 2 3 3) 0 '((0 1) (2 3)) '((0 1) (2 3))) #f)
-  (check-equal? (next-graph '{(1 4) (2 3) (2 4) (3 4)} '(1 2 2 3) 1 '((1) (2) (3) (4)) '((1) (2) (3) (4))) #f)
-  (check-equal? (next-graph '{(1 4) (2 3) (2 4) (3 4)} '(1 2 2 3) 1 '((1) (2 3) (4)) '((1) (2 3) (4)))  #f)
-  (check-equal? (next-graph '((0 1) (0 3) (1 4) (2 3) (2 4) (3 4)) '(2 2 2 3 3) 0 '((0 1 2) (3 4)) '((0 1 2) (3 4)))
-                '((0 3) (0 4) (1 3) (1 4) (2 3) (2 4)))
-  (check-equal? (next-graph '((0 1) (0 2) (1 3) (2 4) (3 4)) '(2 2 2 2 2) 0 '((0 1 2 3 4)) '((0 1 2 3 4)))
-                #f)
-  (check-equal? (next-graph '((0 1) (0 4) (1 4) (2 3) (2 4) (3 4)) '(2 2 2 2 4) 0 '((0 1 2 3) (4)) '((0 1 2 3) (4)))
-                #f)
-  (check-equal? (next-graph '((0 3) (0 4) (1 3) (1 4) (2 3) (2 4) (3 4)) '(2 2 2 4 4) 0 '((0 1 2) (3 4)) '((0 1 2) (3 4)))
-                #f)
-  (check-equal? (next-graph '((0 2) (0 4) (1 3) (1 4) (2 3) (2 4) (3 4)) '(2 2 3 3 4) 0 '((0 1) (2 3) (4)) '((0 1) (2 3) (4)))
-                #f)
-  (check-equal? (next-graph '((0 1) (0 2) (1 3) (1 4) (2 3) (2 4) (3 4)) '(2 3 3 3 3) 0 '((0) (1 2 3 4)) '((0) (1 2 3 4)))
-                #f)
-  (check-equal? (next-graph '((0 3) (0 4) (1 2) (1 3) (1 4) (2 3) (2 4) (3 4)) '(2 3 3 4 4) 0 '((0) (1 2) (3 4)) '((0) (1 2) (3 4)))
-                #f)
-  (check-equal? (next-graph '((0 1) (0 2) (0 4) (1 3) (1 4) (2 3) (2 4) (3 4)) '(3 3 3 3 4) 0 '((0 1 2 3) (4)) '((0 1 2 3) (4)))
-                #f)
-  (check-equal? (next-graph '((0 1) (0 2) (1 3) (2 4) (3 5) (4 5)) '(2 2 2 2 2 2) 0 '((0 1 2 3 4 5)) '((0 1 2 3 4 5)))
-                #f))
-
-;;;;;;;;;;;;;;;;
-; stream version
-
-(define (get-edges-subgraphs-stream edges degrees first-vertex new-all-categories
-                                    new-v1-categories first-second-same-category)
-  (define new-degrees (get-new-degrees edges (cdr degrees) first-vertex))
-  (define new-new-all-categories (get-new-new-categories new-all-categories edges))
-  (define new-new-v1-categories 
-    (if first-second-same-category
-        (get-new-new-categories
-         (remove-categories-before-first-joined new-v1-categories edges)
-         edges)
-        new-new-all-categories))
-  (define sub-graphs-stream (rec-degrees->graphs-stream new-degrees
-                                                    (+ 1 first-vertex)
-                                                    new-new-all-categories
-                                                    new-new-v1-categories))
-  (if (stream-empty? sub-graphs-stream)
-      empty-stream
-      (stream-map (λ (sub-graph) (append edges sub-graph))
-                  sub-graphs-stream)))
-
-; in: degrees list of vertices' degrees.
-; in: all-categories gathering of vertices. First, a category correspond to vertices of same degree.
-; during the recursion, categories can be splitted. The first vertex will only edge to the first
-; vertices of any category.
-; in: first-vertex-categories subset of all-categories to which first-vertex is allowed to edge,
-; depending on how the previous vertex has edged.
-; return: list of graphs matching these degrees
-(define (rec-degrees->graphs-stream degrees first-vertex all-categories first-vertex-categories)
-  (define length-degrees (length degrees))
-  (cond ((equal? degrees '())
-         empty-stream)
-        ((equal? degrees '(0))
-          (stream '())) ; the empty graph
-        ((and (equal? 0 (car degrees)) (memf (λ (deg) (> deg 0)) degrees))
-         empty-stream) ; break as leading to disconnected graphs
-        ((null? (car all-categories))
-         (rec-degrees->graphs-stream degrees first-vertex (cdr all-categories) first-vertex-categories))
-        ((null? (car first-vertex-categories))
-         (rec-degrees->graphs-stream degrees first-vertex all-categories (cdr first-vertex-categories)))
-
-        ((memf (λ (deg) (>= deg length-degrees)) degrees)
-         empty-stream)
-        (else (let* ((first-second-same-category (member (+ 1 first-vertex) (car all-categories)))
-                     ;remove current vertex from categories
-                     (new-all-categories (filter-out-vertex-from-categories first-vertex all-categories))
-                     (new-v1-categories (filter-out-vertex-from-categories first-vertex first-vertex-categories))
-                     (edge-categories (get-edge-categories first-vertex new-v1-categories))
-                     (edgess (rec-parts-w/nb-categories-stream edge-categories (car degrees))))
-                (stream-fold
-                  (λ (acc edges)
-                    (stream-append
-                     acc
-                     (get-edges-subgraphs-stream edges degrees first-vertex new-all-categories
-                                                new-v1-categories first-second-same-category)))
-                  empty-stream
-                  edgess)))))
-
-(struct graph-gen-data (edges degrees first-vertex all-categories first-vertex-categories))
-
-(define (get-edges-gen-data-stream data-edges edges degrees first-vertex new-all-categories
-                                    new-v1-categories first-second-same-category)
-  (define new-degrees (get-new-degrees edges (cdr degrees) first-vertex))
-  (define new-new-all-categories (get-new-new-categories new-all-categories edges))
-  (define new-new-v1-categories 
-    (if first-second-same-category
-        (get-new-new-categories
-         (remove-categories-before-first-joined new-v1-categories edges)
-         edges)
-        new-new-all-categories))
-  (graph-gen-data (append data-edges edges) new-degrees (+ 1 first-vertex) new-new-all-categories
-                  new-new-v1-categories))
-
-(define (tail-degrees->graphs-stream gen-datas)
-  (if (stream-empty? gen-datas) empty-stream
-      (let* ((data (stream-first gen-datas))
-             (data-edges (graph-gen-data-edges data))
-             (degrees (graph-gen-data-degrees data))
-             (first-vertex (graph-gen-data-first-vertex data))
-             (all-categories (graph-gen-data-all-categories data))
-             (first-vertex-categories (graph-gen-data-first-vertex-categories data)))
-        (define length-degrees (length degrees))
-        (cond
-          ((or (equal? degrees '()) (equal? degrees '(0)))
-           (stream-cons data-edges (tail-degrees->graphs-stream (stream-rest gen-datas))))
-          ((and (equal? 0 (car degrees)) (memf (λ (deg) (> deg 0)) degrees))
-           ;do not go further on these edges, the graph will be disconnected
-           (tail-degrees->graphs-stream (stream-rest gen-datas)))
-          ((null? (car all-categories))
-           (tail-degrees->graphs-stream
-            (stream-cons (graph-gen-data data-edges degrees first-vertex (cdr all-categories)
-                                         first-vertex-categories)
-                         (stream-rest gen-datas))))
-          ((null? (car first-vertex-categories))
-           (tail-degrees->graphs-stream
-            (stream-cons (graph-gen-data data-edges degrees first-vertex all-categories
-                                         (cdr first-vertex-categories))
-                         (stream-rest gen-datas))))
-          ((memf (λ (deg) (>= deg length-degrees)) degrees); impossible condition => shortcut
-           (tail-degrees->graphs-stream (stream-rest gen-datas)))
-          (else
-           (let* ((first-second-same-category (member (+ 1 first-vertex) (car all-categories)))
-                  (new-all-categories (filter-out-vertex-from-categories first-vertex all-categories))
-                  (new-v1-categories (filter-out-vertex-from-categories first-vertex first-vertex-categories))
-                  (edge-categories (get-edge-categories first-vertex new-v1-categories))
-                  (edgess (rec-parts-w/nb-categories-stream edge-categories (car degrees))))
-             (tail-degrees->graphs-stream
-              (stream-append
-               (stream-map
-                (λ (edges)
-                  (get-edges-gen-data-stream data-edges edges degrees first-vertex new-all-categories
-                                             new-v1-categories first-second-same-category))
-                edgess)
-               (stream-rest gen-datas)))))))))
-                
 (define (get-degrees-categories degrees first-vertex)
   (let* ((first-degree (car degrees))
          (index (index-where degrees (λ (d) (not (equal? d first-degree))))))
     (if index
-        (cons (range first-vertex (+ first-vertex index))
+        (cons (category (range first-vertex (+ first-vertex index)) +inf.0)
               (get-degrees-categories (drop degrees index) (+ first-vertex index)))
-        (list (range first-vertex (+ first-vertex (length degrees)))))))
+        (list (category (range first-vertex (+ first-vertex (length degrees))) +inf.0)))))
 
 (module+ test
   (check-equal? (get-degrees-categories '(2 2 3 4 4 5) 0)
-                '((0 1) (2) (3 4) (5))))
+                '(#s(category (0 1) +inf.0) #s(category (2) +inf.0) #s(category (3 4) +inf.0) #s(category (5) +inf.0))))
 
 (define (degrees->graphs degrees)
   (define categories (get-degrees-categories degrees 0))
-  (rec-degrees->graphs degrees 0 categories categories (set)))
-
-(define (degrees->graphs-stream degrees)
-  (define categories (get-degrees-categories degrees 0))
-  (tail-degrees->graphs-stream 
-   (stream
-    (graph-gen-data '() degrees 0 categories categories))))
+  (define filled-slots (map (λ (v) 0) (category-vertices (car categories))))
+  (rec-degrees->graphs degrees 0 categories categories filled-slots))
 
 (define (graph->degrees g max-vertex)
   (define degrees (make-vector (+ 1 max-vertex)))
@@ -908,144 +621,129 @@
   (check-equal? (remove-vertex '((0 1) (0 2) (0 4) (1 3) (1 4) (2 3) (2 4) (3 4)) 4)
                 '((0 1) (0 2) (1 3) (2 3)))
 
-  (check-equal? (rec-degrees->graphs '(0 2) 3 '((4)) '((4)) (set)) '())
-  (check-equal? (stream->list (rec-degrees->graphs-stream  '(0 2) 3 '((4)) '((4))))
-                (rec-degrees->graphs '(0 2) 3 '((4)) '((4)) (set)))
-  (check-equal? (rec-degrees->graphs '(0) 1 '((1)) '((1)) (set)) '(()))
-  (check-equal? (stream->list (rec-degrees->graphs-stream  '(0) 1 '((1)) '((1))))
-                (rec-degrees->graphs '(0) 1 '((1)) '((1)) (set)))
-  (check-equal? (get-new-new-categories '((1)) '((0 1))) '((1)))
+  (check-equal? (rec-degrees->graphs '(0 2) 3
+                                     '(#s(category (3) +inf.0) #s(category (4) +inf.0))
+                                     '(#s(category (3) +inf.0) #s(category (4) +inf.0))
+                                     '(0)) '())
+  (check-equal? (rec-degrees->graphs '(0) 1 '(#s(category (1) +inf.0)) '(#s(category (1) +inf.0)) '(1)) '(()))
   (check-equal? (get-new-degrees '((0 1)) '(1) 0) '(0))
   (check-equal? (rec-parts-w/nb-categories '(((0 1))) 1) '(((0 1))))
   (check-equal? (get-edge-categories 0 '((1))) '(((0 1))))
-  (check-equal? (filter-out-vertex-from-categories 0 '((0 1))) '((1)))
 
   (check-equal? (degrees->graphs '(1 1)) '(((0 1)))) ; 0--1
-  (check-equal? (stream->list (degrees->graphs-stream '(1 1)))
-                (degrees->graphs '(1 1)))
-  (check-equal? (stream->list (tail-degrees->graphs-stream
-                               (stream (graph-gen-data '() '(1 1) 0 '((0 1)) '((0 1))))))
-                (degrees->graphs '(1 1)))
 
-  (check-equal? (rec-degrees->graphs '(0) 3 '((3)) '((3)) (set)) '(()))
-  (check-equal? (stream->list (rec-degrees->graphs-stream  '(0) 3 '((3)) '((3))))
-                (rec-degrees->graphs '(0) 3 '((3)) '((3)) (set)))
+  (check-equal? (rec-degrees->graphs '(0) 3 '(#s(category (3) +inf.0)) '(#s(category (3) +inf.0)) '(0)) '(()))
 
-  (check-equal? (get-new-new-categories '((3)) '((2 3))) '((3)))
   (check-equal? (get-new-degrees '((2 3)) '(1) 2) '(0))
   (check-equal? (rec-parts-w/nb-categories '(((2 3))) 1) '(((2 3))))
   (check-equal? (get-edge-categories 2 '((3))) '(((2 3))))
-  (check-equal? (filter-out-vertex-from-categories 2 '((2 3))) '((3)))
-  (check-equal? (rec-degrees->graphs '(1 1) 2 '((2 3)) '((2 3)) (set)) '(((2 3))))
-  (check-equal? (stream->list (rec-degrees->graphs-stream  '(1 1) 2 '((2 3)) '((2 3))))
-                (rec-degrees->graphs '(1 1) 2 '((2 3)) '((2 3)) (set)))
+  (check-equal? (rec-degrees->graphs '(1 1) 2 '(#s(category (2 3) +inf.0)) '(#s(category (2 3) +inf.0)) '(0 0)) '(((2 3))))
 
-  (check-equal? (get-new-new-categories '((2 3)) '((1 2) (1 3))) '((2 3)))
   (check-equal? (get-new-degrees '((1 2) (1 3)) '(2 2) 1) '(1 1))
   (check-equal? (rec-parts-w/nb-categories '(((1 2) (1 3))) 2) '(((1 2) (1 3))))
   (check-equal? (get-edge-categories 1 '((2 3))) '(((1 2) (1 3))))
-  (check-equal? (filter-out-vertex-from-categories 1 '((1) (2 3))) '((2 3)))
-  (check-equal? (rec-degrees->graphs '(2 2 2) 1 '((1) (2 3)) '((1) (2 3)) (set)) '(((1 2) (1 3) (2 3))))
-  (check-equal? (stream->list (rec-degrees->graphs-stream  '(2 2 2) 1 '((1) (2 3)) '((1) (2 3))))
-                (rec-degrees->graphs '(2 2 2) 1 '((1) (2 3)) '((1) (2 3)) (set)))
+  (check-equal? (rec-degrees->graphs '(2 2 2) 1
+                                     '(#s(category (1) +inf.0) #s(category (2 3) +inf.0))
+                                     '(#s(category (1) +inf.0) #s(category (2 3) +inf.0))
+                                     '(0))
+                '(((1 2) (1 3) (2 3))))
 
-  (check-equal? (get-new-new-categories '((1) (2 3)) '((0 2) (0 3))) '((1) (2 3)))
   (check-equal? (get-new-degrees '((0 2) (0 3)) '(2 3 3) 0) '(2 2 2))
 
   (check-equal? (rec-parts-w/nb-categories '() '(2)) '())
   (check-equal? (get-edge-categories 3 '()) '())
-  (check-equal? (filter-out-vertex-from-categories 3 '((3))) '())
-  (check-equal? (rec-degrees->graphs '(2) 3 '((3)) '((3)) (set)) '())
-  (check-equal? (stream->list (rec-degrees->graphs-stream  '(2) 3 '((3)) '((3))))
-                (rec-degrees->graphs '(2) 3 '((3)) '((3)) (set)))
+  (check-equal? (rec-degrees->graphs '(2) 3 '(#s(category (3) +inf.0)) '(#s(category (3) +inf.0)) '(0)) '())
 
-  (check-equal? (get-new-new-categories '((3)) '((2 3))) '((3)))
   (check-equal? (get-new-degrees '((2 3)) '(3) 2) '(2))
   (check-equal? (rec-parts-w/nb-categories '(((2 3))) 1) '(((2 3))))
   (check-equal? (get-edge-categories 2 '((3))) '(((2 3))))
-  (check-equal? (filter-out-vertex-from-categories 2 '((2) (3))) '((3)))
-  (check-equal? (rec-degrees->graphs '(1 3) 2 '((2) (3)) '((2) (3)) (set)) '())
-  (check-equal? (stream->list (rec-degrees->graphs-stream  '(1 3) 2 '((2) (3)) '((2) (3))))
-                (rec-degrees->graphs '(1 3) 2 '((2) (3)) '((2) (3)) (set)))
+  (check-equal? (rec-degrees->graphs '(1 3) 2
+                                     '(#s(category (2) +inf.0) #s(category (3) +inf.0))
+                                     '(#s(category (2) +inf.0) #s(category (3) +inf.0))
+                                     '(0))
+                '())
 
-  (check-equal? (get-new-new-categories '((2) (3)) '((1 2))) '((2) (3)))
   (check-equal? (get-new-degrees '((1 2)) '(2 3) 1) '(1 3))
   (check-equal? (rec-parts-w/nb-categories '(((1 2)) ((1 3))) 1) '(((1 2)) ((1 3))))
   (check-equal? (get-edge-categories 1 '((2) (3))) '(((1 2)) ((1 3))))
-  (check-equal? (filter-out-vertex-from-categories 1 '((1) (2) (3))) '((2) (3)))
-  (check-equal? (rec-degrees->graphs '(1 2 3) 1 '((1) (2) (3)) '((1) (2) (3)) (set)) '())
-  (check-equal? (stream->list (rec-degrees->graphs-stream   '(1 2 3) 1 '((1) (2) (3)) '((1) (2) (3))))
-                (rec-degrees->graphs  '(1 2 3) 1 '((1) (2) (3)) '((1) (2) (3)) (set)))
+  (check-equal? (rec-degrees->graphs '(1 2 3) 1
+                                     '(#s(category (1) +inf.0) #s(category (2) +inf.0) #s(category (3) +inf.0))
+                                     '(#s(category (1) +inf.0) #s(category (2) +inf.0) #s(category (3) +inf.0))
+                                     '(0)) '())
 
-  (check-equal? (get-new-new-categories '((1) (2 3)) '((0 1) (0 2))) '((1) (2) (3)))
   (check-equal? (get-new-degrees '((0 1) (0 2)) '(2 3 3) 0) '(1 2 3))
   (check-equal? (rec-parts-w/nb-categories '(((0 1)) ((0 2) (0 3))) 2) '(((0 1) (0 2)) ((0 2) (0 3))))
   (check-equal? (get-edge-categories 0 '((1) (2 3))) '(((0 1)) ((0 2) (0 3))))
-  (check-equal? (filter-out-vertex-from-categories 0 '((0 1) (2 3))) '((1) (2 3)))
-  (check-equal? (rec-degrees->graphs '(2 2 3 3) 0 '((0 1) (2 3)) '((0 1) (2 3)) (set)) '(((0 2) (0 3) (1 2) (1 3) (2 3))))
-  (check-equal? (stream->list (rec-degrees->graphs-stream  '(2 2 3 3) 0 '((0 1) (2 3)) '((0 1) (2 3))))
-                (rec-degrees->graphs '(2 2 3 3) 0 '((0 1) (2 3)) '((0 1) (2 3)) (set)))
+  (check-equal? (rec-degrees->graphs '(2 2 3 3) 0
+                                     '(#s(category (0 1) +inf.0) #s(category (2 3) +inf.0))
+                                     '(#s(category (0 1) +inf.0) #s(category (2 3) +inf.0))
+                                     '(0 0))
+                '(((0 2) (0 3) (1 2) (1 3) (2 3))))
 
 
-  (check-equal? (rec-degrees->graphs '(1) 4 '((4)) '((4)) (set)) '())
-  (check-equal? (stream->list (rec-degrees->graphs-stream  '(1) 4 '((4)) '((4))))
-                (rec-degrees->graphs '(1) 4 '((4)) '((4)) (set)))
-  (check-equal? (get-new-new-categories '((4)) '([3 4])) '((4)))
+  (check-equal? (rec-degrees->graphs '(1) 4 '(#s(category (4) +inf.0)) '(#s(category (4) +inf.0)) '(0)) '())
   (check-equal? (remove-categories-before-first-joined '((4)) '([3 4])) '((4)))
   (check-equal? (get-new-degrees '([3 4]) '(2) 3) '(1))
   (check-equal? (rec-parts-w/nb-categories '(([3 4])) 0) '(()))
   (check-equal? (get-edge-categories 3 '((4))) '(([3 4])))
-  (check-equal? (filter-out-vertex-from-categories 3 '((4))) '((4)))
-  (check-equal? (rec-degrees->graphs '(0 2) 3 '((4)) '((4)) (set)) '())
-  (check-equal? (stream->list (rec-degrees->graphs-stream '(0 2) 3 '((4)) '((4))))
-                (rec-degrees->graphs '(0 2) 3 '((4)) '((4)) (set)))
-  (check-equal? (get-new-new-categories '((4)) '([2 3] [2 4])) '((4)))
+  (check-equal? (rec-degrees->graphs '(0 2) 3
+                                     '(#s(category (3) +inf.0) #s(category (4) +inf.0))
+                                     '(#s(category (3) +inf.0) #s(category (4) +inf.0))
+                                     '(0))
+                '())
   (check-equal? (remove-categories-before-first-joined '((3) (4)) '([2 3] [2 4])) '((3) (4)))
   (check-equal? (get-new-degrees '([2 3] [2 4]) '(1 3) 2) '(0 2))
   (check-equal? (rec-parts-w/nb-categories  '(([2 3]) ([2 4])) 2) '(([2 3] [2 4])))
   (check-equal? (get-edge-categories 2 '((3) (4))) '(([2 3]) ([2 4])))
-  (check-equal? (filter-out-vertex-from-categories 2 '((2) (3) (4))) '((3) (4)))
-  (check-equal? (rec-degrees->graphs '(2 1 3) 2 '((2) (3) (4)) '((2) (3) (4)) (set)) '())
-  (check-equal? (stream->list (rec-degrees->graphs-stream '(2 1 3) 2 '((2) (3) (4)) '((2) (3) (4))))
-                (rec-degrees->graphs '(2 1 3) 2 '((2) (3) (4)) '((2) (3) (4)) (set)))
-  (check-equal? (get-new-new-categories '((3) (4)) '([1 3])) '((3) (4)))
+  (check-equal? (rec-degrees->graphs '(2 1 3) 2
+                                     '(#s(category (2) +inf.0) #s(category (3) +inf.0) #s(category (4) +inf.0))
+                                     '(#s(category (2) +inf.0) #s(category (3) +inf.0) #s(category (4) +inf.0))
+                                     '(0))
+                '())
   (check-equal? (remove-categories-before-first-joined '((2) (3) (4)) '([1 3])) '((3) (4)))
   (check-equal? (get-new-degrees '([1 3]) '(2 2 3) 1) '(2 1 3))
               
-  (check-equal? (rec-degrees->graphs '(1 2 3) 2 '((2) (3) (4)) '((2) (3) (4)) (set)) '())
-  (check-equal? (stream->list (rec-degrees->graphs-stream '(1 2 3) 2 '((2) (3) (4)) '((2) (3) (4))))
-                (rec-degrees->graphs '(1 2 3) 2 '((2) (3) (4)) '((2) (3) (4)) (set)))
-  (check-equal? (get-new-new-categories '((2) (3) (4)) '([1 2])) '((2) (3) (4)))
+  (check-equal? (rec-degrees->graphs '(1 2 3) 2
+                                     '(#s(category (2) +inf.0) #s(category (3) +inf.0) #s(category (4) +inf.0))
+                                     '(#s(category (2) +inf.0) #s(category (3) +inf.0) #s(category (4) +inf.0))
+                                     '(0))
+                '())
   (check-equal? (remove-categories-before-first-joined '((2) (3) (4)) '([1 2])) '((2) (3) (4)))
   (check-equal? (get-new-degrees '([1 2]) '(2 2 3) 1) '(1 2 3))
 
   (check-equal? (rec-parts-w/nb-categories  '(([1 2]) ([1 3]) ([1 4])) 1) '(([1 2]) ([1 3]) ([1 4])))
   (check-equal? (get-edge-categories 1  '((2) (3) (4)))  '(([1 2]) ([1 3]) ([1 4])))
-  (check-equal? (filter-out-vertex-from-categories 1 '((1) (2) (3) (4))) '((2) (3) (4)))
 
-  (check-equal? (rec-degrees->graphs '(2 2 2) 2 '((2 3) (4)) '((4)) (set)) '())
-  (check-equal? (stream->list (rec-degrees->graphs-stream '(2 2 2) 2 '((2 3) (4)) '((4))))
-                (rec-degrees->graphs '(2 2 2) 2 '((2 3) (4)) '((4)) (set)))
+  (check-equal? (rec-degrees->graphs '(2 2 2) 2
+                                     '(#s(category (2 3) +inf.0) #s(category (4) +inf.0))
+                                     '(#s(category (2 3) 0.0) #s(category (4) +inf.0))
+                                     '(0 0))
+                '())
 
-  (check-equal? (rec-degrees->graphs '(1 2 2 3) 1 '((1) (2) (3) (4)) '((1) (2) (3) (4)) (set)) '({(1 4) (2 3) (2 4) (3 4)}))
-  (check-equal? (stream->list (rec-degrees->graphs-stream '(1 2 2 3) 1 '((1) (2) (3) (4)) '((1) (2) (3) (4))))
-                (rec-degrees->graphs '(1 2 2 3) 1 '((1) (2) (3) (4)) '((1) (2) (3) (4)) (set)))
+  (check-equal? (rec-degrees->graphs '(1 2 2 3) 1
+                                     '(#s(category (1) +inf.0) #s(category (2) +inf.0) #s(category (3) +inf.0) #s(category (4) +inf.0))
+                                     '(#s(category (1) +inf.0) #s(category (2) +inf.0) #s(category (3) +inf.0) #s(category (4) +inf.0))
+                                     '(0))
+                '({(1 4) (2 3) (2 4) (3 4)}))
 
-  (check-equal? (rec-degrees->graphs '(1 2 2 3) 1 '((1) (2 3) (4)) '((1) (2 3) (4)) (set)) '({(1 4) (2 3) (2 4) (3 4)}))
-  (check-equal? (stream->list (rec-degrees->graphs-stream '(1 2 2 3) 1 '((1) (2 3) (4)) '((1) (2 3) (4))))
-                (rec-degrees->graphs '(1 2 2 3) 1 '((1) (2 3) (4)) '((1) (2 3) (4)) (set)))
+  (check-equal? (rec-degrees->graphs '(1 2 2 3) 1
+                                     '(#s(category (1) +inf.0) #s(category (2 3) +inf.0) #s(category (4) +inf.0))
+                                     '(#s(category (1) +inf.0) #s(category (2 3) +inf.0) #s(category (4) +inf.0))
+                                     '(0))
+                '({(1 4) (2 3) (2 4) (3 4)}))
 
-  (check-equal? (get-new-new-categories '((1 2) (3 4)) '([0 1] [0 3])) '((1) (2) (3) (4)))
   (check-equal? (get-new-degrees '([0 1] [0 3]) '(2 2 3 3) 0) '(1 2 2 3))
             
-  (check-equal? (rec-degrees->graphs '(1 1 3 3) 1 '((1 2) (3 4)) '((1 2) (3 4)) (set)) '())
-  (check-equal? (get-new-new-categories '((1 2) (3 4)) '([0 1] [0 2])) '((1 2) (3 4)))
+  (check-equal? (rec-degrees->graphs '(1 1 3 3) 1
+                                     '(#s(category (1 2) +inf.0) #s(category (3 4) +inf.0))
+                                     '(#s(category (1 2) +inf.0) #s(category (3 4) +inf.0))
+                                     '(0 0))
+                '())
   (check-equal? (get-new-degrees '([0 1] [0 2]) '(2 2 3 3) 0) '(1 1 3 3))
 
   (check-equal? (rec-parts-w/nb-categories '(([0 1] [0 2]) ([0 3] [0 4])) 2)
                 '(([0 1] [0 2]) ([0 1] [0 3]) ([0 3] [0 4])))
   (check-equal? (get-edge-categories 0 '((1 2) (3 4))) '(([0 1] [0 2]) ([0 3] [0 4])))
-  (check-equal? (filter-out-vertex-from-categories 0 '((0 1 2) (3 4))) '((1 2) (3 4)))
 
 
   ;'((0 3) (0 4) (1 2) (1 3) (2 4) (3 4)) should not be returned,
@@ -1062,18 +760,11 @@
   (check-equal? (degrees->graphs '(2 2 2 3 3))
                 '(((0 1) (0 3) (1 4) (2 3) (2 4) (3 4))
                   ((0 3) (0 4) (1 3) (1 4) (2 3) (2 4))))
-  (check-equal? (stream->list (degrees->graphs-stream '(2 2 2 3 3)))
-                (degrees->graphs '(2 2 2 3 3)))
-  (check-equal? (stream->list (tail-degrees->graphs-stream
-                               (stream (graph-gen-data '() '(2 2 2 3 3) 0 '((0 1 2) (3 4)) '((0 1 2) (3 4))))))
-                (degrees->graphs '(2 2 2 3 3)))
 
   ; 0--1--3--4--2
   ; `-----------'
   (check-equal? (degrees->graphs '(2 2 2 2 2))
                 '(((0 1) (0 2) (1 3) (2 4) (3 4))))
-  (check-equal? (stream->list (rec-degrees->graphs-stream '(2 2 2 2 2) 0 '((0 1 2 3 4)) '((0 1 2 3 4))))
-                (degrees->graphs '(2 2 2 2 2)))
 
   ; 0   2
   ; |\ /|
@@ -1082,8 +773,6 @@
   ; 1   3
   (check-equal? (degrees->graphs '(2 2 2 2 4))
                 '(((0 1) (0 4) (1 4) (2 3) (2 4) (3 4))))
-  (check-equal? (stream->list (rec-degrees->graphs-stream '(2 2 2 2 4) 0 '((0 1 2 3) (4)) '((0 1 2 3) (4))))
-                (degrees->graphs '(2 2 2 2 4)))
 
 
   ; 0--3--2
@@ -1092,8 +781,6 @@
   ; 1--4
   (check-equal? (degrees->graphs '(2 2 2 4 4))
                 '(((0 3) (0 4) (1 3) (1 4) (2 3) (2 4) (3 4))))
-  (check-equal? (stream->list (rec-degrees->graphs-stream '(2 2 2 4 4) 0 '((0 1 2) (3 4)) '((0 1 2) (3 4))))
-                (degrees->graphs '(2 2 2 4 4)))
 
 
   ; 0--2---3--1
@@ -1101,8 +788,6 @@
   ; `----4----'
   (check-equal? (degrees->graphs '(2 2 3 3 4))
                 '(((0 2) (0 4) (1 3) (1 4) (2 3) (2 4) (3 4))))
-  (check-equal? (stream->list (rec-degrees->graphs-stream '(2 2 3 3 4) 0 '((0 1) (2 3) (4)) '((0 1) (2 3) (4))))
-                (degrees->graphs '(2 2 3 3 4)))
 
   ; 0
   ; |\
@@ -1111,13 +796,9 @@
   ; `---4
   (check-equal? (degrees->graphs '(2 3 3 3 3))
                 '(((0 1) (0 2) (1 3) (1 4) (2 3) (2 4) (3 4))))
-  (check-equal? (stream->list (rec-degrees->graphs-stream '(2 3 3 3 3) 0 '((0) (1 2 3 4)) '((0) (1 2 3 4))))
-                (degrees->graphs '(2 3 3 3 3)))
 
   (check-equal? (degrees->graphs '(2 2 4 4 4))
                 '())
-  (check-equal? (stream->list (rec-degrees->graphs-stream '(2 2 4 4 4) 0 '((0 1) (2 3 4)) '((0 1) (2 3 4))))
-                (degrees->graphs '(2 2 4 4 4)))
 
   ;     0
   ;    / \
@@ -1128,8 +809,6 @@
   ;   1---2
   (check-equal? (degrees->graphs '(2 3 3 4 4))
                 '(((0 3) (0 4) (1 2) (1 3) (1 4) (2 3) (2 4) (3 4))))
-  (check-equal? (stream->list (rec-degrees->graphs-stream '(2 3 3 4 4) 0 '((0) (1 2) (3 4)) '((0) (1 2) (3 4))))
-                (degrees->graphs '(2 3 3 4 4)))
 
   ; ,---------.
   ; 0--2---3--1
@@ -1137,23 +816,13 @@
   ; `----4----'
   (check-equal? (degrees->graphs '(3 3 3 3 4))
                 '(((0 1) (0 2) (0 4) (1 3) (1 4) (2 3) (2 4) (3 4))))
-  (check-equal? (stream->list (rec-degrees->graphs-stream '(3 3 3 3 4) 0 '((0 1 2 3) (4)) '((0 1 2 3) (4))))
-                (degrees->graphs '(3 3 3 3 4)))
 
   (check-equal? (degrees->graphs '(2 4 4 4 4))
                 '())
-  (check-equal? (stream->list (degrees->graphs-stream '(2 4 4 4 4)))
-                (degrees->graphs '(2 4 4 4 4)))
 
   ;'((0 1) (0 2) (1 2) (3 4) (3 5) (4 5)) should not be returned, as disconnected
   (check-equal? (degrees->graphs '(2 2 2 2 2 2)) '(((0 1) (0 2) (1 3) (2 4) (3 5) (4 5))))
-  (check-equal? (stream->list (degrees->graphs-stream  '(2 2 2 2 2 2)))
-                (degrees->graphs '(2 2 2 2 2 2)))
-  (check-equal?
-   (stream->list
-    (tail-degrees->graphs-stream
-     (stream (graph-gen-data '() '(2 2 2 2 2 2) 0 '((0 1 2 3 4 5)) '((0 1 2 3 4 5))))))
-   '(((0 1) (0 2) (1 3) (2 4) (3 5) (4 5))))
+
 
 ;  (check-equal? (degreess 6 14 2 5) '((2 2 2 2 2 4) (2 2 2 2 3 3)))
 
@@ -1203,4 +872,4 @@
 ;  (check-equal? (degreess 6 28 2 5) '((3 5 5 5 5 5) (4 4 5 5 5 5)))
 ;  (check-equal? (degreess 6 30 2 5) '((5 5 5 5 5 5))))
 
- 
+
