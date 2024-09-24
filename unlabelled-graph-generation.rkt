@@ -324,8 +324,6 @@
   (check-equal? (get-new-degrees '((0 1) (0 2)) '(2 3 3) 0) '(1 2 3))
   (check-equal? (get-new-degrees '((0 1) (0 5)) '(2 2 2 2 4) 0) '(1 2 2 2 3)))
 
-
-
 (define (get-nbs-categories category-nbs new-v1-categories filled-slot)
   (define maxes (nbs->maxes category-nbs filled-slot))
   (map (λ (cat new-max) (category (category-vertices cat)
@@ -375,6 +373,10 @@
   (check-equal? (category-split '(1 2) (category '(2 3) +inf.0))
                 (list (category '(2) +inf.0) (category '(3) +inf.0))))
 
+; in: nbs            number of vertices the start vertex is edging to in each category
+; in: filled-slot    number of previous vertices of the first category
+; the starting vertex was already edging to
+; return:            maxes to apply to categories according to these numbers
 (define (nbs->maxes nbs filled-slot)
   (define nbs/slot (cons (+ filled-slot (car nbs)) (cdr nbs)))
   (reverse (rnbs->rmaxes (reverse nbs/slot))))
@@ -444,7 +446,7 @@
   (define new-degrees (get-new-degrees edges (cdr degrees) first-vertex))
   (define new-new-v1-categories 
     (if first-second-same-category
-        (get-nbs-categories category-nbs new-v1-categories (car filled-slots))
+        (get-nbs-categories category-nbs new-v1-categories (cadr filled-slots))
         new-all-categories))
   (define new-filled-slots
     (if (not first-second-same-category)
@@ -462,6 +464,11 @@
            sub-graphs)))
 
 (module+ test
+  (check-equal? (get-edges-subgraphs '((0 1) (0 3)) '(1 1) '(2 2 2 3 3) 0
+                                     '(#s(category (1 2) +inf.0) #s(category (3 4) +inf.0))
+                                     '(#s(category (1 2) +inf.0) #s(category (3 4) +inf.0))
+                                     #t '(0 0 0))
+                '(((0 1) (0 3) (1 4) (2 3) (2 4) (3 4))))
   (check-equal? (get-edges-subgraphs '((0 1) (0 2)) '(2 0) '(2 2 2 2 2 4) 0
                                      '(#s(category (1 2 3 4) +inf.0) #s(category (5) +inf.0))
                                      '(#s(category (1 2 3 4) +inf.0) #s(category (5) +inf.0))
@@ -564,6 +571,17 @@
 
 
 (module+ test
+  (check-equal? (rec-degrees->graphs '(1 2 2 3) 1
+                                     '(#s(category (1 2) +inf.0) #s(category (3 4) +inf.0))
+                                     '(#s(category (1 2) 1.0) #s(category (3 4) +inf.0))
+                                     '(1 0))
+                '(((1 4) (2 3) (2 4) (3 4))))
+  (check-equal? (rec-degrees->graphs '(2 2 2 3 3) 0
+                                     '(#s(category (0 1 2) +inf.0) #s(category (3 4) +inf.0))
+                                     '(#s(category (0 1 2) +inf.0) #s(category (3 4) +inf.0))
+                                     '(0 0 0))
+                '(((0 1) (0 3) (1 4) (2 3) (2 4) (3 4))
+                  ((0 3) (0 4) (1 3) (1 4) (2 3) (2 4))))
   ; all graphs beginning with ((0 1) (0 5)...) should be removed as isomorphic to the first one
   (check-equal? (rec-degrees->graphs '(2 2 2 2 2 4) 0
                                      '(#s(category (0 1 2 3 4) +inf.0) #s(category (5) +inf.0))
@@ -760,6 +778,8 @@
                 '(((0 1) (0 3) (1 4) (2 3) (2 4) (3 4))
                   ((0 3) (0 4) (1 3) (1 4) (2 3) (2 4))))
 
+
+  
   ; 0--1--3--4--2
   ; `-----------'
   (check-equal? (degrees->graphs '(2 2 2 2 2))
