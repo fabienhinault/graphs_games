@@ -447,7 +447,7 @@
   (define new-degrees (get-new-degrees edges (cdr degrees) first-vertex))
   (define new-new-v1-categories 
     (if first-second-same-category
-        (get-nbs-categories category-nbs new-v1-categories (cadr filled-slots))
+        (get-nbs-categories category-nbs new-v1-categories (car filled-slots))
         new-all-categories))
   (define new-filled-slots
     (if (not first-second-same-category)
