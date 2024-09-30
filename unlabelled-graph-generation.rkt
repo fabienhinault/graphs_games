@@ -290,7 +290,6 @@
 (define (neighbours->edges vertex neighbours)
   (map (λ (v) (list vertex v)) neighbours))
 
-(struct category (vertices max) #:prefab)
 
 
 (define (get-edge-categories vertex vertex-categories)

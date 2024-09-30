@@ -109,6 +109,47 @@
   (check-equal? (rec-parts-w/nb '(0 1 2 3) 3) '((0 1 2) (0 1 3) (0 2 3) (1 2 3)))
   (check-equal? (rec-parts-w/nb '(0 1 2 3) 4) '((0 1 2 3))))
 
+
+; verticess is a subdivision of the category in lists of vertices
+(struct category (verticess max) #:prefab)
+
+
+; parts of the set of vertices contained in categories having nb elements,
+; always taking the first elements in each sub-category of categories
+; not more than the max number given by category-maxes
+(define (rec-parts/nb-max-categories categories nb)
+  (cond ((null? categories)
+         '())
+        ((= 0 nb)
+         '(()))
+        ((or (null? (category-verticess (car categories))) (= 0 (category-max (car categories))))
+         (rec-parts/nb-max-categories (cdr categories) nb))
+        ((null? (car (category-verticess (car categories))))
+         (rec-parts/nb-max-categories
+          (cons (category (cdr (category-verticess (car categories)))
+                          (category-max (car categories)))
+                (cdr categories))))
+        (else
+         ; since we only take the first elements of each sub category of each category,
+         ; in (car (category-verticess (car categories))) we only take
+         ; (caar (category-verticess (car categories))).
+         ; so the results are the append of
+         ; - the parts beginning with (caar (category-verticess (car categories))) and
+         ; - the parts not containing (caar (category-verticess (car categories)))
+         (define first-cat (car categories))
+         (define first-subs (category-verticess first-cat))
+         (define first-sub (car first-subs))
+         (append
+          (map (λ (_) (cons (car first-sub) _))
+               (rec-parts-w/nb-max-categories
+                (cons (category (cons (cdr first-sub) (cdr first-subs))
+                                (- (category-max first-cat) 1))
+                      (cdr categories))
+                (- nb 1)))
+          (rec-parts-w/nb-max-categories
+           (cons (category (cdr first-subs) (category-max first-cat))
+                 (cdr categories)))))))
+
 ; partitions of (apply append categories) having nb elements,
 ; always taking the first elements in each category
 ; not more than the max number given by maxes
@@ -136,6 +177,110 @@
 (module+ test
   (check-equal? (rec-parts-w/nb-max-categories '((2 3 4) (5)) '(0 1) 1) '((5)))
   (check-equal? (rec-parts-w/nb-max-categories '((2 3 4) (5)) '(0.0 +inf.0) 1) '((5)))
+  )
+
+
+; buddy function of rec-parts/nb-max-categories
+; returns the numbers of elements taken in the different categories.
+; In unlabelled graph generation, these are the maxes for next iteration
+(define (rec-nbss/nb-max-categories categories nb)
+  (cond ((null? categories)
+         '())
+        ((= 0 nb)
+         (list (map (λ (c) 0) categories)))
+        ((or (null? (category-verticess (car categories))) (= 0 (category-max (car categories))))
+         (map (λ (nbs) (cons 0 nbs))
+              (rec-nbss/nb-max-categories (cdr categories) nb)))
+        ((null? (car (category-verticess (car categories))))
+         (rec-nbss/nb-max-categories
+          (cons (category (cdr (category-verticess (car categories)))
+                          (category-max (car categories)))
+                (cdr categories))))
+        (else
+         ; since we only take the first elements of each sub category of each category,
+         ; in (car (category-verticess (car categories))) we only take
+         ; (caar (category-verticess (car categories))).
+         ; so the results are the append of
+         ; - the parts beginning with (caar (category-verticess (car categories))) and
+         ; - the parts not containing (caar (category-verticess (car categories)))
+         (define first-cat (car categories))
+         (define first-subs (category-verticess first-cat))
+         (define first-sub (car first-subs))
+         (append
+          (map (λ (nbs) (cons (+ 1 (car nbs)) (cdr nbs)))
+               (rec-nbss/nb-max-categories
+                (cons (category (cons (cdr first-sub) (cdr first-subs))
+                                (- (category-max first-cat) 1))
+                      (cdr categories))
+                (- nb 1)))
+          (rec-nbss/nb-max-categories
+           (cons (category (cdr first-subs) (category-max first-cat))
+                 (cdr categories)))))))
+
+
+(define (rec-parts-nbss/nb-max-categories categories nb)
+  (define (empty-res categories)
+    (list (list '() (map (λ (c) 0) categories))))
+  (define (none-in-first-cat categories nb)
+    (let ((res-cdr (rec-parts-nbss/nb-max-categories (cdr categories) nb)))
+      (map (λ (part-nbs) (list (car part-nbs) (cons 0 (cadr part-nbs))))
+           res-cdr)))
+  (define (none-in-first-sub categories nb)
+    (rec-parts-nbss/nb-max-categories
+     (cons (category (cdr (category-verticess (car categories)))
+                     (category-max (car categories)))
+           (cdr categories))
+     nb))
+  (cond ((null? categories) '(() ()))
+        ((= 0 nb) (empty-res categories))
+        ((or (null? (category-verticess (car categories))) (= 0 (category-max (car categories))))
+         (none-in-first-cat categories nb))
+        ((null? (car (category-verticess (car categories))))
+         (none-in-first-sub categories nb))
+        (else
+         ; since we only take the first elements of each sub category of each category,
+         ; in (car (category-verticess (car categories))) we only take
+         ; (caar (category-verticess (car categories))).
+         ; so the results are the append of
+         ; - the parts beginning with (caar (category-verticess (car categories))) and
+         ; - the parts not containing (caar (category-verticess (car categories)))
+         (define first-cat (car categories))
+         (define first-subs (category-verticess first-cat))
+         (define first-sub (car first-subs))
+         (append
+          (map (λ (part-nbs)
+                 (let ((part (car part-nbs))
+                       (nbs (cadr part-nbs)))
+                   (list
+                    (cons (car first-sub) part)
+                    (cons (+ 1 (car nbs)) (cdr nbs)))))
+               (rec-parts-nbss/nb-max-categories
+                (cons (category (cons (cdr first-sub) (cdr first-subs))
+                                (- (category-max first-cat) 1))
+                      (cdr categories))
+                (- nb 1)))
+          (rec-parts-nbss/nb-max-categories
+           (cons (category (cdr first-subs) (category-max first-cat))
+                 (cdr categories)))))))
+(module+ test
+  (check-equal? (rec-parts-nbss/nb-max-categories
+    (list
+     (category '(()) +inf.0)
+     (category '((3 4)) +inf.0))
+    0)
+   '((() (0 0))))
+  (check-equal? (rec-parts-nbss/nb-max-categories
+    (list
+     (category '((2)) +inf.0)
+     (category '((3 4)) +inf.0))
+    1)
+   '())
+  (check-equal? (rec-parts-nbss/nb-max-categories
+    (list
+     (category '((1 2)) +inf.0)
+     (category '((3 4)) +inf.0))
+    2)
+   '())
   )
 
 ; buddy function of rec-parts-w/nb-max-categories
