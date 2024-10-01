@@ -217,21 +217,21 @@
            (cons (category (cdr first-subs) (category-max first-cat))
                  (cdr categories)))))))
 
+(define (none-in-first-cat categories nb)
+  (let ((res-cdr (rec-parts-nbss/nb-max-categories (cdr categories) nb)))
+    (map (λ (part-nbs) (list (car part-nbs) (cons 0 (cadr part-nbs))))
+         res-cdr)))
 
 (define (rec-parts-nbss/nb-max-categories categories nb)
   (define (empty-res categories)
     (list (list '() (map (λ (c) 0) categories))))
-  (define (none-in-first-cat categories nb)
-    (let ((res-cdr (rec-parts-nbss/nb-max-categories (cdr categories) nb)))
-      (map (λ (part-nbs) (list (car part-nbs) (cons 0 (cadr part-nbs))))
-           res-cdr)))
   (define (none-in-first-sub categories nb)
     (rec-parts-nbss/nb-max-categories
      (cons (category (cdr (category-verticess (car categories)))
                      (category-max (car categories)))
            (cdr categories))
      nb))
-  (cond ((null? categories) '(() ()))
+  (cond ((null? categories) '())
         ((= 0 nb) (empty-res categories))
         ((or (null? (category-verticess (car categories))) (= 0 (category-max (car categories))))
          (none-in-first-cat categories nb))
@@ -261,7 +261,8 @@
                 (- nb 1)))
           (rec-parts-nbss/nb-max-categories
            (cons (category (cdr first-subs) (category-max first-cat))
-                 (cdr categories)))))))
+                 (cdr categories))
+           nb)))))
 (module+ test
   (check-equal? (rec-parts-nbss/nb-max-categories
     (list
@@ -271,16 +272,27 @@
    '((() (0 0))))
   (check-equal? (rec-parts-nbss/nb-max-categories
     (list
+     (category '() +inf.0))
+    1)
+   '())
+  (check-equal? (rec-parts-nbss/nb-max-categories
+    (list
      (category '((2)) +inf.0)
      (category '((3 4)) +inf.0))
     1)
-   '())
+   '(((2) (1 0)) ((3) (0 1))))
   (check-equal? (rec-parts-nbss/nb-max-categories
     (list
      (category '((1 2)) +inf.0)
      (category '((3 4)) +inf.0))
     2)
-   '())
+   '(((1 2) (2 0)) ((1 3) (1 1)) ((3 4) (0 2))))
+  (check-equal? (rec-parts-nbss/nb-max-categories
+    (list
+     (category '((1 2 3)) +inf.0)
+     (category '((4 5)) +inf.0))
+    2)
+   '(((1 2) (2 0)) ((1 4) (1 1)) ((4 5) (0 2))))
   )
 
 ; buddy function of rec-parts-w/nb-max-categories
@@ -779,6 +791,7 @@
  rec-parts-w/nb-categories-stream
  next-part/nb-categories
  next-part/nb-max-categories
+ rec-parts-nbss/nb-max-categories
  first-part/nb-categories
  first-part/nb-max-categories
  part->nbs)
