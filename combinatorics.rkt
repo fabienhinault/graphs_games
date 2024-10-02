@@ -283,6 +283,12 @@
    '(((2) (1 0)) ((3) (0 1))))
   (check-equal? (rec-parts-nbss/nb-max-categories
     (list
+     (category '((2)) 1.0)
+     (category '((3) (4)) +inf.0))
+    1)
+   '(((2) (1 0)) ((3) (0 1)) ((4) (0 1))))
+  (check-equal? (rec-parts-nbss/nb-max-categories
+    (list
      (category '((1 2)) +inf.0)
      (category '((3 4)) +inf.0))
     2)
@@ -794,4 +800,6 @@
  rec-parts-nbss/nb-max-categories
  first-part/nb-categories
  first-part/nb-max-categories
- part->nbs)
+ part->nbs
+ (contract-out
+  [struct category ((verticess (listof list?)) (max number?))]))
