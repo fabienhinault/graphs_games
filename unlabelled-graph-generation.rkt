@@ -326,19 +326,19 @@
 
 (define (get-nbs-categories category-nbs new-v1-categories filled-slot)
   (define maxes (nbs->maxes category-nbs filled-slot))
-  (map (λ (cat new-max) (category (category-vertices cat)
+  (map (λ (cat new-max) (category (category-verticess cat)
                                   (min new-max (category-max cat))))
        new-v1-categories
        maxes))
 
 
 (module+ test
-  (check-equal? (get-nbs-categories  '(1 1) '(#s(category (1 2 3 4) +inf.0) #s(category (5) +inf.0)) 0)
-                                     '(#s(category (1 2 3 4) 1.0) #s(category (5) +inf.0)))
-  (check-equal? (get-nbs-categories  '(2 0) '(#s(category (1 2 3 4) +inf.0) #s(category (5) +inf.0)) 0)
-                                     '(#s(category (1 2 3 4) +inf.0) #s(category (5) +inf.0)))
-  (check-equal? (get-nbs-categories  '(0 1) '(#s(category (2 3 4) +inf.0) #s(category (5) +inf.0)) 1)
-                                     '(#s(category (2 3 4) 1.0) #s(category (5) +inf.0))))
+  (check-equal? (get-nbs-categories  '(1 1) '(#s(category ((1 2 3 4)) +inf.0) #s(category ((5)) +inf.0)) 0)
+                                     '(#s(category ((1 2 3 4)) 1.0) #s(category ((5)) +inf.0)))
+  (check-equal? (get-nbs-categories  '(2 0) '(#s(category ((1 2 3 4)) +inf.0) #s(category ((5)) +inf.0)) 0)
+                                     '(#s(category ((1 2 3 4)) +inf.0) #s(category ((5)) +inf.0)))
+  (check-equal? (get-nbs-categories  '(0 1) '(#s(category ((2 3 4)) +inf.0) #s(category ((5)) +inf.0)) 1)
+                                     '(#s(category ((2 3 4)) 1.0) #s(category ((5)) +inf.0))))
 
 ; return the categories after the one of the first edge in edges
 ; in the recursive process of degrees->graphs
@@ -357,21 +357,23 @@
   (check-equal? (remove-categories-before-first-joined '((1 2) (3 4)) '((0 3) (0 4))) '((3 4))))
 
 (define (category-split edges-vertices cat)
-  
-  (map (λ (vertices)
-         (category vertices (category-max cat)))
-       (filter not-null?
-               (call-with-values
-                (λ () (partition (λ (v) (member v edges-vertices)) (category-vertices cat)))
-                list))))
+  (category
+   (filter not-null?
+           (append-map
+            (λ (vertices)
+              (call-with-values
+               (λ () (partition (λ (v) (member v edges-vertices)) vertices))
+               list))
+            (category-verticess cat)))
+   (category-max cat)))
 
 (module+ test
-  (check-equal? (category-split '(1 2) (category '(1 2 3) +inf.0))
-                (list (category '(1 2) +inf.0) (category '(3) +inf.0)))
-  (check-equal? (category-split '(1 2) (category '(1) +inf.0))
-                (list (category '(1) +inf.0)))
-  (check-equal? (category-split '(1 2) (category '(2 3) +inf.0))
-                (list (category '(2) +inf.0) (category '(3) +inf.0))))
+  (check-equal? (category-split '(1 2) (category '((1 2 3)) +inf.0))
+                (category '((1 2) (3)) +inf.0))
+  (check-equal? (category-split '(1 2) (category '((1)) +inf.0))
+                (category '((1)) +inf.0))
+  (check-equal? (category-split '(1 2) (category '((2 3)) +inf.0))
+                (category '((2) (3)) +inf.0)))
 
 ; in: nbs            number of vertices the start vertex is edging to in each category
 ; in: filled-slot    number of previous vertices of the first category
@@ -390,11 +392,13 @@
          (cons +inf.0 (cdr rnbs)))))
 
 (define (category-filter-out-vertex cat vertex)
-  (category (filter-not (λ (v) (equal? v vertex)) (category-vertices cat))
+  (category (filter not-null?
+                    (map (λ (vs) (filter-not (λ (v) (equal? v vertex)) vs))
+                         (category-verticess cat)))
             (category-max cat)))
 
 (define (category-null? cat)
-  (null? (category-vertices cat)))
+  (null? (category-verticess cat)))
 
 (define (filter-out-vertex-from-categories vertex categories)
   (filter-not
@@ -404,14 +408,14 @@
 
 (module+ test
   (check-equal? (filter-out-vertex-from-categories
-                 0 '(#s(category (0 1) +inf.0) #s(category (2 3) +inf.0)))
-                '(#s(category (1) +inf.0) #s(category (2 3) +inf.0)))
+                 0 '(#s(category ((0 1)) +inf.0) #s(category ((2 3)) +inf.0)))
+                '(#s(category ((1)) +inf.0) #s(category ((2 3)) +inf.0)))
   (check-equal? (filter-out-vertex-from-categories
-                 1 '(#s(category (1) +inf.0) #s(category (2) +inf.0) #s(category (3) +inf.0)))
-                '(#s(category (2) +inf.0) #s(category (3) +inf.0)))
+                 1 '(#s(category ((1)) +inf.0) #s(category ((2)) +inf.0) #s(category ((3)) +inf.0)))
+                '(#s(category ((2)) +inf.0) #s(category ((3)) +inf.0)))
   
-  (check-equal? (filter-out-vertex-from-categories 0 '(#s(category (0 1) +inf.0)))
-                '(#s(category (1) +inf.0))))
+  (check-equal? (filter-out-vertex-from-categories 0 '(#s(category ((0 1)) +inf.0)))
+                '(#s(category ((1)) +inf.0))))
 
 (define (get-new-v1-maxes first-vertex-maxes first-vertex-categories new-v1-categories)
   (if (equal? (length first-vertex-categories) (length new-v1-categories))
@@ -419,7 +423,7 @@
       (cdr first-vertex-maxes)))
 
 (define (get-new-filled-slots edges first-vertex categories filled-slots)
-  (define first-category-vertices (category-vertices (car categories)))
+  (define first-category-vertices (append* (category-verticess (car categories))))
   (define first-category-edges (filter (λ (e) (member (cadr e) first-category-vertices)) edges))
   (define first-category-edgeds (map cadr first-category-edges))
   (map (λ (fs v)
@@ -431,13 +435,16 @@
   
 (module+ test
   (check-equal? (get-new-filled-slots '((0 1) (0 5)) 0
-                                      '(#s(category (1 2 3 4) +inf.0) #s(category (5) +inf.0))
+                                      '(#s(category ((1 2 3 4)) +inf.0) #s(category ((5)) +inf.0))
                                       '(0 0 0 0))
                 '(1 0 0 0))
   (check-equal? (get-new-filled-slots '((0 1) (0 2)) 0
-                                      '(#s(category (1 2 3 4) +inf.0) #s(category (5) +inf.0))
+                                      '(#s(category ((1 2 3 4)) +inf.0) #s(category ((5)) +inf.0))
                                       '(0 0 0 0))
                 '(1 1 0 0)))
+
+(define (category-zeros cat)
+  (map (λ (v) 0) (append* (category-verticess cat))))
 
 ;
 ; in: new-v1-categories    previous first vertex categories without first vertex
@@ -450,7 +457,7 @@
         new-all-categories))
   (define new-filled-slots
     (if (not first-second-same-category)
-        (map (λ (v) 0) (category-vertices (car new-new-v1-categories)))
+        (category-zeros (car new-new-v1-categories))
         (get-new-filled-slots edges first-vertex new-new-v1-categories (cdr filled-slots))))
   (define sub-graphs (rec-degrees->graphs new-degrees
                                       (+ 1 first-vertex)
@@ -465,30 +472,30 @@
 
 (module+ test
   (check-equal? (get-edges-subgraphs '((0 1) (0 3)) '(1 1) '(2 2 2 3 3) 0
-                                     '(#s(category (1 2) +inf.0) #s(category (3 4) +inf.0))
-                                     '(#s(category (1 2) +inf.0) #s(category (3 4) +inf.0))
+                                     '(#s(category ((1 2)) +inf.0) #s(category ((3 4)) +inf.0))
+                                     '(#s(category ((1 2)) +inf.0) #s(category ((3 4)) +inf.0))
                                      #t '(0 0 0))
                 '(((0 1) (0 3) (1 4) (2 3) (2 4) (3 4))))
   (check-equal? (get-edges-subgraphs '((0 1) (0 2)) '(2 0) '(2 2 2 2 2 4) 0
-                                     '(#s(category (1 2 3 4) +inf.0) #s(category (5) +inf.0))
-                                     '(#s(category (1 2 3 4) +inf.0) #s(category (5) +inf.0))
+                                     '(#s(category ((1 2 3 4)) +inf.0) #s(category ((5)) +inf.0))
+                                     '(#s(category ((1 2 3 4)) +inf.0) #s(category ((5)) +inf.0))
                                      #t '(0 0 0 0 0))
                 '(((0 1) (0 2) (1 5) (2 5) (3 4) (3 5) (4 5))))
   (check-equal? (get-edges-subgraphs '((1 5)) '(0 1) '(1 1 2 2 4) 1
-                                     '(#s(category (2 3 4) +inf.0) #s(category (5) +inf.0))
-                                     '(#s(category (2 3 4) +inf.0) #s(category (5) +inf.0))
+                                     '(#s(category ((2 3 4)) +inf.0) #s(category ((5)) +inf.0))
+                                     '(#s(category ((2 3 4)) +inf.0) #s(category ((5)) +inf.0))
                                      #t '(1 1 0 0))
                 '(((1 5) (2 5) (3 4) (3 5) (4 5))))
   (check-equal? (get-edges-subgraphs '((2 5)) '(0 1) '(1 2 2 3) 2
-                                     '(#s(category (3 4) +inf.0) #s(category (5) +inf.0))
-                                     '(#s(category (3 4) +inf.0) #s(category (5) +inf.0))
+                                     '(#s(category ((3 4)) +inf.0) #s(category ((5)) +inf.0))
+                                     '(#s(category ((3 4)) +inf.0) #s(category ((5)) +inf.0))
                                      #t '(1 0 0))
                 '(((2 5) (3 4) (3 5) (4 5))))
   ; there should be no graph beginning with '((0 1) (0 5)), because other vertices of degree 2
   ; should not edge to more than one other degree-2-vertex.
   (check-equal? (get-edges-subgraphs '((0 1) (0 5)) '(1 1) '(2 2 2 2 2 4) 0
-                                     '(#s(category (1 2 3 4) +inf.0) #s(category (5) +inf.0))
-                                     '(#s(category (1 2 3 4) +inf.0) #s(category (5) +inf.0))
+                                     '(#s(category ((1 2 3 4)) +inf.0) #s(category ((5)) +inf.0))
+                                     '(#s(category ((1 2 3 4)) +inf.0) #s(category ((5)) +inf.0))
                                      #t '(0 0 0 0 0))
                 '()))
 
@@ -499,38 +506,30 @@
       (cons (- (car raw-maxes) filled-slot) (cdr raw-maxes))))
 
 (module+ test
-  (check-equal? (get-maxes '(#s(category (2 3 4) 1.0) #s(category (5) +inf.0)) 1)
+  (check-equal? (get-maxes '(#s(category ((2 3 4)) 1.0) #s(category ((5)) +inf.0)) 1)
                 '(0.0 +inf.0))
-  (check-equal? (get-maxes '(#s(category (2 3 4)  +inf.0) #s(category (5) +inf.0)) 1)
+  (check-equal? (get-maxes '(#s(category ((2 3 4))  +inf.0) #s(category ((5)) +inf.0)) 1)
                 '(+inf.0 +inf.0)))
 
+(define (get-categories/filled-slot categories filled-slot)
+  (if (null? categories)
+      '()
+      (cons (category (category-verticess (car categories))
+                      (- (category-max (car categories)) filled-slot))
+            (cdr categories))))
 
-(define (parts categories nb filled-slot)
-  (rec-parts-w/nb-max-categories (map category-vertices categories)
-                                 (get-maxes categories filled-slot) nb))
+(define (get-partnbss categories nb filled-slot)
+  (rec-parts-nbss/nb-max-categories (get-categories/filled-slot categories filled-slot) nb))
 
-(module+ test
-  (check-equal? (parts '(#s(category (2 3 4) 1.0) #s(category (5) +inf.0)) 1 1)
-                '((5)))
-  (check-equal? (parts '(#s(category (2 3 4) +inf.0) #s(category (5) +inf.0)) 1 1)
-                '((2) (5))))
+(define (category-member vertex cat)
+  (member vertex (append* (category-verticess cat))))
 
-(define (nbss categories nb filled-slot)
-  (rec-nbss-w/nb-max-categories (map category-vertices categories)
-                                (get-maxes categories filled-slot) nb))
-
-(module+ test
-  (check-equal? (nbss '(#s(category (2 3 4) 1.0) #s(category (5) +inf.0)) 1 1)
-                '((0 1)))
-  (check-equal? (nbss '(#s(category (2 3 4) +inf.0) #s(category (5) +inf.0)) 1 1)
-                '((1 0) (0 1))))
 
 ;@defproc[(rec-degrees->graphs [degrees (listof(integer?))] first-vertex all-categories first-vertex-categories)
 ;         (listof(listof integer?))]{
 ;      Returns list of graphs representing unlabelled graphs satisfying the constraints of degrees
 ;              }
                                                                                                                  
-
 ; in: degrees                    list of vertices' degrees.
 ; in: first-vertex               integer. Value of the first-vertex of the returned graphs.
 ; in: all-categories             gathering of vertices. First, a category correspond to vertices of same degree.
@@ -556,46 +555,46 @@
          (rec-degrees->graphs degrees first-vertex all-categories (cdr first-vertex-categories)))
         ((memf (λ (deg) (>= deg length-degrees)) degrees)
          '());break
-        (else (let* ((first-second-same-category (member (+ 1 first-vertex)
-                                                         (category-vertices (car all-categories))))
+        (else (let* ((first-second-same-category (category-member (+ 1 first-vertex) (car all-categories)))
                      (new-all-categories (filter-out-vertex-from-categories first-vertex all-categories))
                      (new-v1-categories (filter-out-vertex-from-categories first-vertex first-vertex-categories))
-                     (neighbourss (parts new-v1-categories (car degrees) (car filled-slots)))
-                     (category-nbss (nbss new-v1-categories (car degrees) (car filled-slots)))
-                     (edgess (map (λ (ns) (neighbours->edges first-vertex ns)) neighbourss)))
+                     (neighboursnbss (get-partnbss new-v1-categories (car degrees) (car filled-slots))))
                  (append-map
-                  (λ (edges category-nbs)
-                    (get-edges-subgraphs edges category-nbs degrees first-vertex new-all-categories
-                                         new-v1-categories first-second-same-category filled-slots))
-                  edgess category-nbss)))))
+                  (λ (neighboursnbs)
+                    (let*
+                        ((category-nbs (cadr neighboursnbs))
+                         (edges (neighbours->edges first-vertex (car neighboursnbs))))
+                      (get-edges-subgraphs edges category-nbs degrees first-vertex new-all-categories
+                                           new-v1-categories first-second-same-category filled-slots)))
+                  neighboursnbss)))))
 
 
 (module+ test
   (check-equal? (rec-degrees->graphs '(1 2 2 3) 1
-                                     '(#s(category (1 2) +inf.0) #s(category (3 4) +inf.0))
-                                     '(#s(category (1 2) 1.0) #s(category (3 4) +inf.0))
+                                     '(#s(category ((1 2)) +inf.0) #s(category ((3 4)) +inf.0))
+                                     '(#s(category ((1 2)) 1.0) #s(category ((3 4)) +inf.0))
                                      '(1 0))
                 '(((1 4) (2 3) (2 4) (3 4))))
   (check-equal? (rec-degrees->graphs '(2 2 2 3 3) 0
-                                     '(#s(category (0 1 2) +inf.0) #s(category (3 4) +inf.0))
-                                     '(#s(category (0 1 2) +inf.0) #s(category (3 4) +inf.0))
+                                     '(#s(category ((0 1 2)) +inf.0) #s(category ((3 4)) +inf.0))
+                                     '(#s(category ((0 1 2)) +inf.0) #s(category ((3 4)) +inf.0))
                                      '(0 0 0))
                 '(((0 1) (0 3) (1 4) (2 3) (2 4) (3 4))
                   ((0 3) (0 4) (1 3) (1 4) (2 3) (2 4))))
   ; all graphs beginning with ((0 1) (0 5)...) should be removed as isomorphic to the first one
   (check-equal? (rec-degrees->graphs '(2 2 2 2 2 4) 0
-                                     '(#s(category (0 1 2 3 4) +inf.0) #s(category (5) +inf.0))
-                                     '(#s(category (0 1 2 3 4) +inf.0) #s(category (5) +inf.0))
+                                     '(#s(category ((0 1 2 3 4)) +inf.0) #s(category ((5)) +inf.0))
+                                     '(#s(category ((0 1 2 3 4)) +inf.0) #s(category ((5)) +inf.0))
                                      '(0 0 0 0 0))
                 '(((0 1) (0 2) (1 5) (2 5) (3 4) (3 5) (4 5))))
   (check-equal? (rec-degrees->graphs '(1 1 2 2 4) 1
-                                     '(#s(category (1 2 3 4) +inf.0) #s(category (5) +inf.0))
-                                     '(#s(category (1 2 3 4) +inf.0) #s(category (5) +inf.0))
+                                     '(#s(category ((1 2 3 4)) +inf.0) #s(category ((5)) +inf.0))
+                                     '(#s(category ((1 2 3 4)) +inf.0) #s(category ((5)) +inf.0))
                                      '(1 1 0 0))
               '(((1 5) (2 5) (3 4) (3 5) (4 5))))
   (check-equal? (rec-degrees->graphs '(1 2 2 2 3) 1
-                                     '(#s(category (1 2 3 4) +inf.0) #s(category (5) +inf.0))
-                                     '(#s(category (1 2 3 4) 1.0) #s(category (5) +inf.0))
+                                     '(#s(category ((1 2 3 4)) +inf.0) #s(category ((5)) +inf.0))
+                                     '(#s(category ((1 2 3 4)) 1.0) #s(category ((5)) +inf.0))
                                      '(1 0 0 0))
               '())
   )
@@ -604,17 +603,17 @@
   (let* ((first-degree (car degrees))
          (index (index-where degrees (λ (d) (not (equal? d first-degree))))))
     (if index
-        (cons (category (range first-vertex (+ first-vertex index)) +inf.0)
+        (cons (category (list (range first-vertex (+ first-vertex index))) +inf.0)
               (get-degrees-categories (drop degrees index) (+ first-vertex index)))
-        (list (category (range first-vertex (+ first-vertex (length degrees))) +inf.0)))))
+        (list (category (list (range first-vertex (+ first-vertex (length degrees)))) +inf.0)))))
 
 (module+ test
   (check-equal? (get-degrees-categories '(2 2 3 4 4 5) 0)
-                '(#s(category (0 1) +inf.0) #s(category (2) +inf.0) #s(category (3 4) +inf.0) #s(category (5) +inf.0))))
+                '(#s(category ((0 1)) +inf.0) #s(category ((2)) +inf.0) #s(category ((3 4)) +inf.0) #s(category ((5)) +inf.0))))
 
 (define (degrees->graphs degrees)
   (define categories (get-degrees-categories degrees 0))
-  (define filled-slots (map (λ (v) 0) (category-vertices (car categories))))
+  (define filled-slots (category-zeros (car categories)))
   (rec-degrees->graphs degrees 0 categories categories filled-slots))
 
 (define (graph->degrees g max-vertex)
@@ -639,29 +638,29 @@
                 '((0 1) (0 2) (1 3) (2 3)))
 
   (check-equal? (rec-degrees->graphs '(0 2) 3
-                                     '(#s(category (3) +inf.0) #s(category (4) +inf.0))
-                                     '(#s(category (3) +inf.0) #s(category (4) +inf.0))
+                                     '(#s(category ((3)) +inf.0) #s(category ((4)) +inf.0))
+                                     '(#s(category ((3)) +inf.0) #s(category ((4)) +inf.0))
                                      '(0)) '())
-  (check-equal? (rec-degrees->graphs '(0) 1 '(#s(category (1) +inf.0)) '(#s(category (1) +inf.0)) '(1)) '(()))
+  (check-equal? (rec-degrees->graphs '(0) 1 '(#s(category ((1)) +inf.0)) '(#s(category ((1)) +inf.0)) '(1)) '(()))
   (check-equal? (get-new-degrees '((0 1)) '(1) 0) '(0))
   (check-equal? (rec-parts-w/nb-categories '(((0 1))) 1) '(((0 1))))
   (check-equal? (get-edge-categories 0 '((1))) '(((0 1))))
 
   (check-equal? (degrees->graphs '(1 1)) '(((0 1)))) ; 0--1
 
-  (check-equal? (rec-degrees->graphs '(0) 3 '(#s(category (3) +inf.0)) '(#s(category (3) +inf.0)) '(0)) '(()))
+  (check-equal? (rec-degrees->graphs '(0) 3 '(#s(category ((3)) +inf.0)) '(#s(category ((3)) +inf.0)) '(0)) '(()))
 
   (check-equal? (get-new-degrees '((2 3)) '(1) 2) '(0))
   (check-equal? (rec-parts-w/nb-categories '(((2 3))) 1) '(((2 3))))
   (check-equal? (get-edge-categories 2 '((3))) '(((2 3))))
-  (check-equal? (rec-degrees->graphs '(1 1) 2 '(#s(category (2 3) +inf.0)) '(#s(category (2 3) +inf.0)) '(0 0)) '(((2 3))))
+  (check-equal? (rec-degrees->graphs '(1 1) 2 '(#s(category ((2 3)) +inf.0)) '(#s(category ((2 3)) +inf.0)) '(0 0)) '(((2 3))))
 
   (check-equal? (get-new-degrees '((1 2) (1 3)) '(2 2) 1) '(1 1))
   (check-equal? (rec-parts-w/nb-categories '(((1 2) (1 3))) 2) '(((1 2) (1 3))))
   (check-equal? (get-edge-categories 1 '((2 3))) '(((1 2) (1 3))))
   (check-equal? (rec-degrees->graphs '(2 2 2) 1
-                                     '(#s(category (1) +inf.0) #s(category (2 3) +inf.0))
-                                     '(#s(category (1) +inf.0) #s(category (2 3) +inf.0))
+                                     '(#s(category ((1)) +inf.0) #s(category ((2 3)) +inf.0))
+                                     '(#s(category ((1)) +inf.0) #s(category ((2 3)) +inf.0))
                                      '(0))
                 '(((1 2) (1 3) (2 3))))
 
@@ -669,14 +668,14 @@
 
   (check-equal? (rec-parts-w/nb-categories '() '(2)) '())
   (check-equal? (get-edge-categories 3 '()) '())
-  (check-equal? (rec-degrees->graphs '(2) 3 '(#s(category (3) +inf.0)) '(#s(category (3) +inf.0)) '(0)) '())
+  (check-equal? (rec-degrees->graphs '(2) 3 '(#s(category ((3)) +inf.0)) '(#s(category ((3)) +inf.0)) '(0)) '())
 
   (check-equal? (get-new-degrees '((2 3)) '(3) 2) '(2))
   (check-equal? (rec-parts-w/nb-categories '(((2 3))) 1) '(((2 3))))
   (check-equal? (get-edge-categories 2 '((3))) '(((2 3))))
   (check-equal? (rec-degrees->graphs '(1 3) 2
-                                     '(#s(category (2) +inf.0) #s(category (3) +inf.0))
-                                     '(#s(category (2) +inf.0) #s(category (3) +inf.0))
+                                     '(#s(category ((2)) +inf.0) #s(category ((3)) +inf.0))
+                                     '(#s(category ((2)) +inf.0) #s(category ((3)) +inf.0))
                                      '(0))
                 '())
 
@@ -684,28 +683,28 @@
   (check-equal? (rec-parts-w/nb-categories '(((1 2)) ((1 3))) 1) '(((1 2)) ((1 3))))
   (check-equal? (get-edge-categories 1 '((2) (3))) '(((1 2)) ((1 3))))
   (check-equal? (rec-degrees->graphs '(1 2 3) 1
-                                     '(#s(category (1) +inf.0) #s(category (2) +inf.0) #s(category (3) +inf.0))
-                                     '(#s(category (1) +inf.0) #s(category (2) +inf.0) #s(category (3) +inf.0))
+                                     '(#s(category ((1)) +inf.0) #s(category ((2)) +inf.0) #s(category ((3)) +inf.0))
+                                     '(#s(category ((1)) +inf.0) #s(category ((2)) +inf.0) #s(category ((3)) +inf.0))
                                      '(0)) '())
 
   (check-equal? (get-new-degrees '((0 1) (0 2)) '(2 3 3) 0) '(1 2 3))
   (check-equal? (rec-parts-w/nb-categories '(((0 1)) ((0 2) (0 3))) 2) '(((0 1) (0 2)) ((0 2) (0 3))))
   (check-equal? (get-edge-categories 0 '((1) (2 3))) '(((0 1)) ((0 2) (0 3))))
   (check-equal? (rec-degrees->graphs '(2 2 3 3) 0
-                                     '(#s(category (0 1) +inf.0) #s(category (2 3) +inf.0))
-                                     '(#s(category (0 1) +inf.0) #s(category (2 3) +inf.0))
+                                     '(#s(category ((0 1)) +inf.0) #s(category ((2 3)) +inf.0))
+                                     '(#s(category ((0 1)) +inf.0) #s(category ((2 3)) +inf.0))
                                      '(0 0))
                 '(((0 2) (0 3) (1 2) (1 3) (2 3))))
 
 
-  (check-equal? (rec-degrees->graphs '(1) 4 '(#s(category (4) +inf.0)) '(#s(category (4) +inf.0)) '(0)) '())
+  (check-equal? (rec-degrees->graphs '(1) 4 '(#s(category ((4)) +inf.0)) '(#s(category ((4)) +inf.0)) '(0)) '())
   (check-equal? (remove-categories-before-first-joined '((4)) '([3 4])) '((4)))
   (check-equal? (get-new-degrees '([3 4]) '(2) 3) '(1))
   (check-equal? (rec-parts-w/nb-categories '(([3 4])) 0) '(()))
   (check-equal? (get-edge-categories 3 '((4))) '(([3 4])))
   (check-equal? (rec-degrees->graphs '(0 2) 3
-                                     '(#s(category (3) +inf.0) #s(category (4) +inf.0))
-                                     '(#s(category (3) +inf.0) #s(category (4) +inf.0))
+                                     '(#s(category ((3)) +inf.0) #s(category ((4)) +inf.0))
+                                     '(#s(category ((3)) +inf.0) #s(category ((4)) +inf.0))
                                      '(0))
                 '())
   (check-equal? (remove-categories-before-first-joined '((3) (4)) '([2 3] [2 4])) '((3) (4)))
@@ -713,16 +712,16 @@
   (check-equal? (rec-parts-w/nb-categories  '(([2 3]) ([2 4])) 2) '(([2 3] [2 4])))
   (check-equal? (get-edge-categories 2 '((3) (4))) '(([2 3]) ([2 4])))
   (check-equal? (rec-degrees->graphs '(2 1 3) 2
-                                     '(#s(category (2) +inf.0) #s(category (3) +inf.0) #s(category (4) +inf.0))
-                                     '(#s(category (2) +inf.0) #s(category (3) +inf.0) #s(category (4) +inf.0))
+                                     '(#s(category ((2)) +inf.0) #s(category ((3)) +inf.0) #s(category ((4)) +inf.0))
+                                     '(#s(category ((2)) +inf.0) #s(category ((3)) +inf.0) #s(category ((4)) +inf.0))
                                      '(0))
                 '())
   (check-equal? (remove-categories-before-first-joined '((2) (3) (4)) '([1 3])) '((3) (4)))
   (check-equal? (get-new-degrees '([1 3]) '(2 2 3) 1) '(2 1 3))
               
   (check-equal? (rec-degrees->graphs '(1 2 3) 2
-                                     '(#s(category (2) +inf.0) #s(category (3) +inf.0) #s(category (4) +inf.0))
-                                     '(#s(category (2) +inf.0) #s(category (3) +inf.0) #s(category (4) +inf.0))
+                                     '(#s(category ((2)) +inf.0) #s(category ((3)) +inf.0) #s(category ((4)) +inf.0))
+                                     '(#s(category ((2)) +inf.0) #s(category ((3)) +inf.0) #s(category ((4)) +inf.0))
                                      '(0))
                 '())
   (check-equal? (remove-categories-before-first-joined '((2) (3) (4)) '([1 2])) '((2) (3) (4)))
@@ -732,28 +731,28 @@
   (check-equal? (get-edge-categories 1  '((2) (3) (4)))  '(([1 2]) ([1 3]) ([1 4])))
 
   (check-equal? (rec-degrees->graphs '(2 2 2) 2
-                                     '(#s(category (2 3) +inf.0) #s(category (4) +inf.0))
-                                     '(#s(category (2 3) 0.0) #s(category (4) +inf.0))
+                                     '(#s(category ((2 3)) +inf.0) #s(category ((4)) +inf.0))
+                                     '(#s(category ((2 3)) 0.0) #s(category ((4)) +inf.0))
                                      '(0 0))
                 '())
 
   (check-equal? (rec-degrees->graphs '(1 2 2 3) 1
-                                     '(#s(category (1) +inf.0) #s(category (2) +inf.0) #s(category (3) +inf.0) #s(category (4) +inf.0))
-                                     '(#s(category (1) +inf.0) #s(category (2) +inf.0) #s(category (3) +inf.0) #s(category (4) +inf.0))
+                                     '(#s(category ((1)) +inf.0) #s(category ((2)) +inf.0) #s(category ((3)) +inf.0) #s(category ((4)) +inf.0))
+                                     '(#s(category ((1)) +inf.0) #s(category ((2)) +inf.0) #s(category ((3)) +inf.0) #s(category ((4)) +inf.0))
                                      '(0))
                 '({(1 4) (2 3) (2 4) (3 4)}))
 
   (check-equal? (rec-degrees->graphs '(1 2 2 3) 1
-                                     '(#s(category (1) +inf.0) #s(category (2 3) +inf.0) #s(category (4) +inf.0))
-                                     '(#s(category (1) +inf.0) #s(category (2 3) +inf.0) #s(category (4) +inf.0))
+                                     '(#s(category ((1)) +inf.0) #s(category ((2 3)) +inf.0) #s(category ((4)) +inf.0))
+                                     '(#s(category ((1)) +inf.0) #s(category ((2 3)) +inf.0) #s(category ((4)) +inf.0))
                                      '(0))
                 '({(1 4) (2 3) (2 4) (3 4)}))
 
   (check-equal? (get-new-degrees '([0 1] [0 3]) '(2 2 3 3) 0) '(1 2 2 3))
             
   (check-equal? (rec-degrees->graphs '(1 1 3 3) 1
-                                     '(#s(category (1 2) +inf.0) #s(category (3 4) +inf.0))
-                                     '(#s(category (1 2) +inf.0) #s(category (3 4) +inf.0))
+                                     '(#s(category ((1 2)) +inf.0) #s(category ((3 4)) +inf.0))
+                                     '(#s(category ((1 2)) +inf.0) #s(category ((3 4)) +inf.0))
                                      '(0 0))
                 '())
   (check-equal? (get-new-degrees '([0 1] [0 2]) '(2 2 3 3) 0) '(1 1 3 3))
