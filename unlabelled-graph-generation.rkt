@@ -375,6 +375,17 @@
   (check-equal? (category-split '(1 2) (category '((2 3)) +inf.0))
                 (category '((2) (3)) +inf.0)))
 
+(define (split-categories edges categories)
+  (define vertices (map cadr edges))
+  (map (λ (cat) (category-split vertices cat))
+       categories))
+
+(define (get-new-new-categories edges category-nbs new-categories filled-slot)
+  (define nbs-categories (get-nbs-categories category-nbs new-categories filled-slot))
+  (split-categories  edges nbs-categories))
+
+
+
 ; in: nbs            number of vertices the start vertex is edging to in each category
 ; in: filled-slot    number of previous vertices of the first category
 ; the starting vertex was already edging to
@@ -451,17 +462,18 @@
 (define (get-edges-subgraphs edges category-nbs degrees first-vertex new-all-categories
                              new-v1-categories first-second-same-category filled-slots)
   (define new-degrees (get-new-degrees edges (cdr degrees) first-vertex))
+  (define new-new-all-categories (split-categories edges new-all-categories))
   (define new-new-v1-categories 
     (if first-second-same-category
-        (get-nbs-categories category-nbs new-v1-categories (car filled-slots))
-        new-all-categories))
+        (get-new-new-categories edges category-nbs new-v1-categories (car filled-slots))
+        new-new-all-categories))
   (define new-filled-slots
     (if (not first-second-same-category)
         (category-zeros (car new-new-v1-categories))
         (get-new-filled-slots edges first-vertex new-new-v1-categories (cdr filled-slots))))
   (define sub-graphs (rec-degrees->graphs new-degrees
                                       (+ 1 first-vertex)
-                                      new-all-categories
+                                      new-new-all-categories
                                       new-new-v1-categories
                                       new-filled-slots))
   (if (null? sub-graphs)
@@ -471,6 +483,11 @@
            sub-graphs)))
 
 (module+ test
+  (check-equal? (get-edges-subgraphs '((0 1) (0 2)) '(2) '(2 3 3 3 3) 0
+                                     '(#s(category ((1 2 3 4)) +inf.0))
+                                     '(#s(category ((1 2 3 4)) +inf.0))
+                                     #f '(0))
+                '(((0 1) (0 2) (1 3) (1 4) (2 3) (2 4) (3 4))))
   (check-equal? (get-edges-subgraphs '((0 1) (0 3)) '(1 1) '(2 2 2 3 3) 0
                                      '(#s(category ((1 2)) +inf.0) #s(category ((3 4)) +inf.0))
                                      '(#s(category ((1 2)) +inf.0) #s(category ((3 4)) +inf.0))
@@ -572,7 +589,7 @@
 (module+ test
   (check-equal? (rec-degrees->graphs '(1 2 2 3) 1
                                      '(#s(category ((1 2)) +inf.0) #s(category ((3 4)) +inf.0))
-                                     '(#s(category ((1 2)) 1.0) #s(category ((3 4)) +inf.0))
+                                     '(#s(category ((1) (2)) 1.0) #s(category ((3) (4)) +inf.0))
                                      '(1 0))
                 '(((1 4) (2 3) (2 4) (3 4))))
   (check-equal? (rec-degrees->graphs '(2 2 2 3 3) 0
