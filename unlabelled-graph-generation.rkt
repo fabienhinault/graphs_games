@@ -384,7 +384,12 @@
   (define nbs-categories (get-nbs-categories category-nbs new-categories filled-slot))
   (split-categories  edges nbs-categories))
 
-
+(module+ test
+  (check-equal?
+   (get-new-new-categories
+    '((0 1) (0 5)) '(1 0 1)
+    '(#s(category ((1 2 3)) +inf.0) #s(category ((4)) +inf.0) #s(category ((5)) +inf.0)) 0)
+   '(#s(category ((1) (2 3)) 1.0) #s(category ((4)) 0.0) #s(category ((5)) +inf.0))))
 
 ; in: nbs            number of vertices the start vertex is edging to in each category
 ; in: filled-slot    number of previous vertices of the first category
@@ -483,6 +488,11 @@
            sub-graphs)))
 
 (module+ test
+  (check-equal? (get-edges-subgraphs '((0 1) (0 5)) '(1 0 1) '(2 2 2 2 3 5)  0
+                                     '(#s(category ((1 2 3)) +inf.0) #s(category ((4)) +inf.0) #s(category ((5)) +inf.0))
+                                     '(#s(category ((1 2 3)) +inf.0) #s(category ((4)) +inf.0) #s(category ((5)) +inf.0))
+                                     '(1 2 3) '(0 0 0 0))
+                '(((0 1) (0 5) (1 5) (2 4) (2 5) (3 4) (3 5) (4 5))))
   (check-equal? (get-edges-subgraphs '((0 1) (0 2)) '(2) '(2 3 3 3 3) 0
                                      '(#s(category ((1 2 3 4)) +inf.0))
                                      '(#s(category ((1 2 3 4)) +inf.0))
@@ -587,6 +597,12 @@
 
 
 (module+ test
+  (check-equal? 
+   (rec-degrees->graphs '(2 2 2 2 3 5) 0
+                        '(#s(category ((0 1 2 3)) +inf.0) #s(category ((4)) +inf.0) #s(category ((5)) +inf.0))
+                        '(#s(category ((0 1 2 3)) +inf.0) #s(category ((4)) +inf.0) #s(category ((5)) +inf.0))
+                        '(0 0 0 0))
+   '(((0 1) (0 5) (1 5) (2 4) (2 5) (3 4) (3 5) (4 5))))
   (check-equal? (rec-degrees->graphs '(1 2 2 3) 1
                                      '(#s(category ((1 2)) +inf.0) #s(category ((3 4)) +inf.0))
                                      '(#s(category ((1) (2)) 1.0) #s(category ((3) (4)) +inf.0))
@@ -870,8 +886,18 @@
   ; |  / \|
   ; 1-'   4
   (check-equal? (degrees->graphs '(2 2 2 2 2 4)) '(((0 1) (0 2) (1 5) (2 5) (3 4) (3 5) (4 5))))
+  (check-equal? (degrees->graphs '(2 2 2 2 3 3))
+                '(((0 1) (0 2) (1 4) (2 5) (3 4) (3 5) (4 5))
+                  ((0 1) (0 4) (1 4) (2 3) (2 5) (3 5) (4 5))
+                  ((0 1) (0 4) (1 5) (2 3) (2 4) (3 5) (4 5))
+                  ((0 1) (0 4) (1 5) (2 3) (2 5) (3 4) (4 5))
+                  ((0 1) (0 4) (1 5) (2 4) (2 5) (3 4) (3 5))))
+
+;  (check-equal? (degreess 6 16 2 5) '((2 2 2 2 3 5) (2 2 2 2 4 4) (2 2 2 3 3 4) (2 2 3 3 3 3)))
+  (check-equal? (degrees->graphs '(2 2 2 2 3 5))
+                '(((0 1) (0 5) (1 5) (2 4) (2 5) (3 4) (3 5) (4 5))))
   )
-; (2 2 2 2 3 3)
+
 ;  (check-equal? (degreess 6 16 2 5) '((2 2 2 2 3 5) (2 2 2 2 4 4) (2 2 2 3 3 4) (2 2 3 3 3 3)))
 ;  (check-equal? (degreess 6 18 2 5) '((2 2 2 2 5 5)
 ;                                      (2 2 2 3 4 5)
