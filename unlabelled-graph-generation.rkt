@@ -1,5 +1,7 @@
 #lang racket
 
+; This is not the implemented algorithm:
+;https://users.cecs.anu.edu.au/~bdm/papers/orderly.pdf
 
 (require srfi/67) ; compare procedures
 (require "graph-utils.rkt")
