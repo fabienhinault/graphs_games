@@ -222,6 +222,12 @@
     (map (λ (part-nbs) (list (car part-nbs) (cons 0 (cadr part-nbs))))
          res-cdr)))
 
+(define (inferior-maxes categories nb)
+  (define new-cats (map (λ (cat) (category (category-verticess cat) +inf.0)) (cdr categories)))
+  (define res-inf-maxes (rec-parts-nbss/nb-max-categories new-cats nb))
+  (map (λ (part-nbs) (list (car part-nbs) (cons 0 (cadr part-nbs))))
+         res-inf-maxes))
+
 (define (rec-parts-nbss/nb-max-categories categories nb)
   (define (empty-res categories)
     (list (list '() (map (λ (c) 0) categories))))
@@ -233,8 +239,10 @@
      nb))
   (cond ((null? categories) '())
         ((= 0 nb) (empty-res categories))
-        ((or (null? (category-verticess (car categories))) (= 0 (category-max (car categories))))
+        ((= 0 (category-max (car categories)))
          (none-in-first-cat categories nb))
+        ((null? (category-verticess (car categories)))
+         (inferior-maxes categories nb))
         ((null? (car (category-verticess (car categories))))
          (none-in-first-sub categories nb))
         (else
@@ -265,11 +273,14 @@
            nb)))))
 (module+ test
   (check-equal? (rec-parts-nbss/nb-max-categories
-    (list
-     (category '(()) +inf.0)
-     (category '((3 4)) +inf.0))
-    0)
-   '((() (0 0))))
+                 '(#s(category ((2 3)) 1.0) #s(category ((4)) 0.0) #s(category ((5)) +inf.0))
+                 2) '(((2 5) (1 0 1)) ((4 5) (0 1 1))))
+  (check-equal? (rec-parts-nbss/nb-max-categories
+                 (list
+                  (category '(()) +inf.0)
+                  (category '((3 4)) +inf.0))
+                 0)
+                '((() (0 0))))
   (check-equal? (rec-parts-nbss/nb-max-categories
     (list
      (category '() +inf.0))

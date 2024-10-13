@@ -328,19 +328,23 @@
 
 (define (get-nbs-categories category-nbs new-v1-categories filled-slot)
   (define maxes (nbs->maxes category-nbs filled-slot))
-  (map (λ (cat new-max) (category (category-verticess cat)
-                                  (min new-max (category-max cat))))
+  (map (λ (cat new-max) (category (category-verticess cat) new-max))
        new-v1-categories
        maxes))
 
 
 (module+ test
   (check-equal? (get-nbs-categories  '(1 1) '(#s(category ((1 2 3 4)) +inf.0) #s(category ((5)) +inf.0)) 0)
-                                     '(#s(category ((1 2 3 4)) 1.0) #s(category ((5)) +inf.0)))
+                                     '(#s(category ((1 2 3 4)) 1) #s(category ((5)) +inf.0)))
   (check-equal? (get-nbs-categories  '(2 0) '(#s(category ((1 2 3 4)) +inf.0) #s(category ((5)) +inf.0)) 0)
                                      '(#s(category ((1 2 3 4)) +inf.0) #s(category ((5)) +inf.0)))
   (check-equal? (get-nbs-categories  '(0 1) '(#s(category ((2 3 4)) +inf.0) #s(category ((5)) +inf.0)) 1)
-                                     '(#s(category ((2 3 4)) 1.0) #s(category ((5)) +inf.0))))
+                                     '(#s(category ((2 3 4)) 1) #s(category ((5)) +inf.0)))
+  (check-equal?
+   (get-nbs-categories
+    '(0 1 1)
+    '(#s(category ((3)) 1.0) #s(category ((4)) 0.0) #s(category ((5)) +inf.0)) 0)
+   '(#s(category ((3)) 0) #s(category ((4)) 1) #s(category ((5)) +inf.0))))
 
 ; return the categories after the one of the first edge in edges
 ; in the recursive process of degrees->graphs
@@ -391,7 +395,12 @@
    (get-new-new-categories
     '((0 1) (0 5)) '(1 0 1)
     '(#s(category ((1 2 3)) +inf.0) #s(category ((4)) +inf.0) #s(category ((5)) +inf.0)) 0)
-   '(#s(category ((1) (2 3)) 1.0) #s(category ((4)) 0.0) #s(category ((5)) +inf.0))))
+   '(#s(category ((1) (2 3)) 1) #s(category ((4)) 0) #s(category ((5)) +inf.0)))
+  (check-equal?
+   (get-new-new-categories
+    '((2 4) (2 5)) '(0 1 1)
+    '(#s(category ((3)) 1.0) #s(category ((4)) 0.0) #s(category ((5)) +inf.0)) 0)
+   '(#s(category ((3)) 0) #s(category ((4)) 1) #s(category ((5)) +inf.0))))
 
 ; in: nbs            number of vertices the start vertex is edging to in each category
 ; in: filled-slot    number of previous vertices of the first category
@@ -490,6 +499,20 @@
            sub-graphs)))
 
 (module+ test
+  (check-equal?
+   (get-edges-subgraphs
+    '((2 4) (2 5)) '(0 1 1) '(2 2 3 3) 2
+    '(#s(category ((3)) +inf.0) #s(category ((4)) +inf.0) #s(category ((5)) +inf.0))
+    '(#s(category ((3)) 1.0) #s(category ((4)) 0.0) #s(category ((5)) +inf.0))
+    '(3) '(0 0))
+   '(((2 4) (2 5) (3 4) (3 5) (4 5))))
+  (check-equal?
+   (get-edges-subgraphs
+    '((1 5)) '(0 0 1) '(1 2 2 3 4) 1
+    '(#s(category ((2 3)) +inf.0) #s(category ((4)) +inf.0) #s(category ((5)) +inf.0))
+    '(#s(category ((2 3)) 1.0) #s(category ((4)) 0.0) #s(category ((5)) +inf.0))
+    '(2 3) '(1 0 0))
+   '(((1 5) (2 4) (2 5) (3 4) (3 5) (4 5))))
   (check-equal? (get-edges-subgraphs '((0 1) (0 5)) '(1 0 1) '(2 2 2 2 3 5)  0
                                      '(#s(category ((1 2 3)) +inf.0) #s(category ((4)) +inf.0) #s(category ((5)) +inf.0))
                                      '(#s(category ((1 2 3)) +inf.0) #s(category ((4)) +inf.0) #s(category ((5)) +inf.0))
@@ -599,6 +622,19 @@
 
 
 (module+ test
+  (check-equal? 
+   (rec-degrees->graphs
+    '(2 2 3 3) 2
+    '(#s(category ((2 3)) +inf.0) #s(category ((4)) +inf.0) #s(category ((5)) +inf.0))
+    '(#s(category ((2 3)) 1.0) #s(category ((4)) 0.0) #s(category ((5)) +inf.0))
+    '(0 0))
+   '(((2 4) (2 5) (3 4) (3 5) (4 5))))
+  (check-equal? 
+   (rec-degrees->graphs '(1 2 2 3 4) 1
+                        '(#s(category ((1 2 3)) +inf.0) #s(category ((4)) +inf.0) #s(category ((5)) +inf.0))
+                        '(#s(category ((1 2 3)) 1.0) #s(category ((4)) 0.0) #s(category ((5)) +inf.0))
+                        '(1 0 0))
+   '(((1 5) (2 4) (2 5) (3 4) (3 5) (4 5))))
   (check-equal? 
    (rec-degrees->graphs '(2 2 2 2 3 5) 0
                         '(#s(category ((0 1 2 3)) +inf.0) #s(category ((4)) +inf.0) #s(category ((5)) +inf.0))
