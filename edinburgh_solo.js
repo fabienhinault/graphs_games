@@ -48,7 +48,14 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     function someonePlays(svgNode) {
         const idNumber = getNodeId(svgNode);
+        console.info(idNumber);
+        const valueBefore = valuator.getSequenceValue(game.moves);
         game.play(idNumber);
+        const valueAfter = valuator.getSequenceValue(game.moves);
+        console.info(evaluator.getSequenceValue(game.moves));
+        if (valueAfter > valueBefore) {
+            console.warn(`${valueAfter} > ${valueBefore}`);
+        }
     }
 
     function robotPlays() {
@@ -56,8 +63,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const botSvgNode = document.querySelector(`g#id${botNodeId}`);
         document.body.addEventListener('click', onClick);
         someonePlays(botSvgNode);
-        console.debug(evaluator.getSequenceValue(game.moves));
-        console.debug(localStorage.length);
+        console.info(localStorage.length);
     }
 
     function robotThinksAndPlays() {
