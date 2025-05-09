@@ -1,9 +1,10 @@
 #!/bin/bash
 
 DOTDIR=$1
-DOTFILE=$DOTDIR/_.dot
+BASENAME=$(basename $DOTDIR)
+DOTFILE=$DOTDIR/$BASENAME.dot
 
-dot -Tsvg $DOTFILE -o ${DOTDIR}/_.svg
+dot -Tsvg $DOTFILE -o ${DOTDIR}/$BASENAME.svg
 
 
 

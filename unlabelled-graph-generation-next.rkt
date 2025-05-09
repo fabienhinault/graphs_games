@@ -1,19 +1,19 @@
 #lang racket
 
+(require "combinatorics.rkt")
+(require "unlabelled-graph-common.rkt")
 
 ; first, next
 
 (define (first-part categories nb filled-slot)
-  (first-part/nb-max-categories (map category-vertices categories)
-                                 (get-maxes categories filled-slot) nb))
+  (first-part/nb-max-categories categories nb))
 
 ;(define (first-nbs categories nb filled-slot)
 ;  (first-nbs/nb-max-categories (map category-vertices categories)
 ;                                 (get-maxes categories filled-slot) nb))
 
 (define (next-part categories nb filled-slot)
-  (next-part/nb-max-categories (map category-vertices categories)
-                                 (get-maxes categories filled-slot) nb part))
+  (next-part/nb-max-categories categories nb))
 
 ;(define (next-nbs categories nb filled-slot)
 ;  (next-nbs/nb-max-categories (map category-vertices categories)
@@ -69,6 +69,7 @@
 
 
 (module+ test
+  (require rackunit)
   (check-equal? (first-graph '(0 2) 3 '((4)) '((4))) #f)
   (check-equal? (first-graph '(0) 1 '((1)) '((1))) '())
   (check-equal? (first-graph '(1 1) 0 '((0 1)) '((0 1))) '((0 1))) ; 0--1

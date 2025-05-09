@@ -7,6 +7,7 @@
 (require "graph-utils.rkt")
 (require "combinatorics.rkt")
 (require "graph-generate.rkt")
+(require "unlabelled-graph-common.rkt")
 
 (define (new-name-numeric-generator)
   (let ((count 0))
@@ -47,6 +48,7 @@
   (list-ref new-names vertex))
 
 (module+ test
+  (require rackunit)
   (define
     G '((0 1) (2 3) (4 5) (6 7) (6 11) (8 9) (10 9) (12 13) (14 13) (14 15) (16 17) (18 15) (0 20) (1 19)
               (2 19) (4 20) (8 22) (10 22) (12 21) (16 20) (18 19) (3 23) (5 23) (7 23) (5 27) (7 11)
@@ -56,12 +58,64 @@
   (check-equal?
    (rename-numeric-graph
     G
-    '(0 1 2 4 6 8 10 12 14 16 18 23 3 5 7 24 27 25 26 28 29 9 11 17 15 13 19 20 22 21))
-   '((0 1) (2 4) (6 8) (10 12) (10 23) (14 16) (18 16) (3 5) (7 5) (7 24) (27 25) (26 24) (0 29)
-           (1 28) (2 28) (6 29) (14 11) (18 11) (3 9) (27 29) (26 28) (4 17) (8 17) (12 17) (8 20)
-           (12 23) (15 13) (15 19) (4 9) (15 29) (13 20) (19 20) (22 21) (16 24) (13 5) (20 5)
-           (22 25) (21 5) (21 24) (21 25) (16 9) (23 9) (23 11) (13 11) (19 9) (19 11) (22 29)
-           (22 9) (24 25) (25 28) (28 29) (28 11))))
+    '(0 1 2 11 3 12 4 13 5 17 6 16 7 23 8 24 9 25 10 27 26 29 28 14 15 19 20 18 21 22))
+   '((0 1)
+    (2 11)
+    (3 12)
+    (4 13)
+    (4 16)
+    (5 17)
+    (6 17)
+    (7 23)
+    (8 23)
+    (8 24)
+    (9 25)
+    (10 24)
+    (0 26)
+    (1 27)
+    (2 27)
+    (3 26)
+    (5 28)
+    (6 28)
+    (7 29)
+    (9 26)
+    (10 27)
+    (11 14)
+    (12 14)
+    (13 14)
+    (12 18)
+    (13 16)
+    (15 19)
+    (15 20)
+    (11 29)
+    (15 26)
+    (19 18)
+    (20 18)
+    (21 22)
+    (17 24)
+    (19 23)
+    (18 23)
+    (21 25)
+    (22 23)
+    (22 24)
+    (22 25)
+    (17 29)
+    (16 29)
+    (16 28)
+    (19 28)
+    (20 29)
+    (20 28)
+    (21 26)
+    (21 29)
+    (24 25)
+    (25 27)
+    (27 26)
+    (27 28)))
+  (check-equal?
+   (rename-numeric-graph
+    '((0 1) (0 2) (0 3) (1 2) (1 3))
+    '(3 2 0 1))
+   '((3 2) (3 0) (3 1) (2 0) (2 1))))
 
 (define (sort-graph graph)
   (define sorted-vertices (map (λ (edge) (sort edge <)) graph))
@@ -90,9 +144,41 @@
     node-renamings))
 
 (module+ test
-  (require rackunit)
   (check-not-false (member (hash->list (get-degree-renaming '((0 1) (0 2)) 3 (new-name-numeric-generator)))
-                           '(((0 . 2) (2 . 1) (1 . 0)) ((0 . 2) (1 . 0) (2 . 1))))))
+                           '(((0 . 2) (2 . 1) (1 . 0)) ((0 . 2) (1 . 0) (2 . 1)))))
+
+  (check-equal? (get-degree-renaming G 30 (new-name-numeric-generator))
+  '#hash((0 . 0)
+         (1 . 1)
+         (2 . 2)
+         (3 . 11)
+         (4 . 3)
+         (5 . 12)
+         (6 . 4)
+         (7 . 13)
+         (8 . 5)
+         (9 . 17)
+         (10 . 6)
+         (11 . 16)
+         (12 . 7)
+         (13 . 23)
+         (14 . 8)
+         (15 . 24)
+         (16 . 9)
+         (17 . 25)
+         (18 . 10)
+         (19 . 27)
+         (20 . 26)
+         (21 . 29)
+         (22 . 28)
+         (23 . 14)
+         (24 . 15)
+         (25 . 19)
+         (26 . 20)
+         (27 . 18)
+         (28 . 21)
+         (29 . 22)))
+)
 
 (define (get-neighbours-min-degree vertex graph forbiddens get-vertex-degree)
   (define vertex-degree (get-vertex-degree vertex graph))
@@ -140,25 +226,6 @@
 )
 
 
-
-(define (get-new-edgess n)
-  (let* ((new-node (- n 1))
-         (old-nodes (range (- n 1)))
-         (new-edges (map (λ (_) (list _ new-node)) old-nodes)))
-    ; remove '() at start
-    (cdr (tailrec-parts '(()) new-edges))))
-
-(module+ test
-  (check-equal? (get-new-edgess 0) '())
-  (check-equal? (get-new-edgess 1) '())
-  (check-equal? (get-new-edgess 2) '(((0 1))))
-  (check-equal? (get-new-edgess 3) '(((0 2)) ((1 2)) ((1 2) (0 2))))
-  (check-equal? (get-new-edgess 4)
-                '(((0 3)) ((1 3))
-                          ((1 3) (0 3)) 
-                          ((2 3))
-                          ((2 3) (0 3)) ((2 3) (1 3))
-                          ((2 3) (1 3) (0 3)))))
 
 
 ; old-graph: a graph of (n - 1) vertices
@@ -307,45 +374,6 @@
   (check-equal? (get-edge-categories 1 '((2) (3))) '(((1 2)) ((1 3)))))
 
 
-; removes 1 to the degrees of vertices strictly after first-vertex appearing in edges
-; edges starting with first-vertex which will decrement degrees
-; degrees of vertices strictly after first-vertex
-; params
-; edges: beginning with first-vertex which we consider to decrease degrees
-; degrees: vertices degrees, first-vertex' degree beeing removed
-; first-vertex
-(define (get-new-degrees edges degrees first-vertex)
-  (define second-vertices (map cadr edges))
-  (define offset-second-vertices (map (λ (v) (- v first-vertex 1)) second-vertices))
-  (foldl (λ (i degs) (list-update degs i (λ (d) (- d 1))))
-         degrees
-         offset-second-vertices))
-
-(module+ test
-  (check-equal? (get-new-degrees '((0 1) (0 2)) '(1 1) 0) '(0 0))
-  (check-equal? (get-new-degrees '((0 1) (0 2)) '(2 3 3) 0) '(1 2 3))
-  (check-equal? (get-new-degrees '((0 1) (0 5)) '(2 2 2 2 4) 0) '(1 2 2 2 3)))
-
-(define (get-nbs-categories category-nbs new-v1-categories filled-slot)
-  (define maxes (nbs->maxes category-nbs filled-slot))
-  (map (λ (cat new-max) (category (category-verticess cat) new-max))
-       new-v1-categories
-       maxes))
-
-
-(module+ test
-  (check-equal? (get-nbs-categories  '(1 1) '(#s(category ((1 2 3 4)) +inf.0) #s(category ((5)) +inf.0)) 0)
-                                     '(#s(category ((1 2 3 4)) 1) #s(category ((5)) +inf.0)))
-  (check-equal? (get-nbs-categories  '(2 0) '(#s(category ((1 2 3 4)) +inf.0) #s(category ((5)) +inf.0)) 0)
-                                     '(#s(category ((1 2 3 4)) +inf.0) #s(category ((5)) +inf.0)))
-  (check-equal? (get-nbs-categories  '(0 1) '(#s(category ((2 3 4)) +inf.0) #s(category ((5)) +inf.0)) 1)
-                                     '(#s(category ((2 3 4)) 1) #s(category ((5)) +inf.0)))
-  (check-equal?
-   (get-nbs-categories
-    '(0 1 1)
-    '(#s(category ((3)) 1.0) #s(category ((4)) 0.0) #s(category ((5)) +inf.0)) 0)
-   '(#s(category ((3)) 0) #s(category ((4)) 1) #s(category ((5)) +inf.0))))
-
 ; return the categories after the one of the first edge in edges
 ; in the recursive process of degrees->graphs
 ; we must not edge the first vertex to vertices of a category
@@ -402,21 +430,6 @@
     '(#s(category ((3)) 1.0) #s(category ((4)) 0.0) #s(category ((5)) +inf.0)) 0)
    '(#s(category ((3)) 0) #s(category ((4)) 1) #s(category ((5)) +inf.0))))
 
-; in: nbs            number of vertices the start vertex is edging to in each category
-; in: filled-slot    number of previous vertices of the first category
-; the starting vertex was already edging to
-; return:            maxes to apply to categories according to these numbers
-(define (nbs->maxes nbs filled-slot)
-  (define nbs/slot (cons (+ filled-slot (car nbs)) (cdr nbs)))
-  (reverse (rnbs->rmaxes (reverse nbs/slot))))
-
-(define (rnbs->rmaxes rnbs)
-  (cond ((null? rnbs)
-         '())
-        ((equal? 0 (car rnbs))
-         (cons +inf.0 (rnbs->rmaxes (cdr rnbs))))
-        (else
-         (cons +inf.0 (cdr rnbs)))))
 
 (define (category-filter-out-vertex cat vertex)
   (category (filter not-null?
@@ -550,18 +563,6 @@
                                      '(#s(category ((1 2 3 4)) +inf.0) #s(category ((5)) +inf.0))
                                      #t '(0 0 0 0 0))
                 '()))
-
-(define (get-maxes categories filled-slot)
-  (define raw-maxes (map category-max categories))
-  (if (null? raw-maxes)
-      '()
-      (cons (- (car raw-maxes) filled-slot) (cdr raw-maxes))))
-
-(module+ test
-  (check-equal? (get-maxes '(#s(category ((2 3 4)) 1.0) #s(category ((5)) +inf.0)) 1)
-                '(0.0 +inf.0))
-  (check-equal? (get-maxes '(#s(category ((2 3 4))  +inf.0) #s(category ((5)) +inf.0)) 1)
-                '(+inf.0 +inf.0)))
 
 (define (get-categories/filled-slot categories filled-slot)
   (if (null? categories)
@@ -840,8 +841,7 @@
   ;
   ; 0   2   0   1
   ; |\ /|   |\ /|
-  ; 1 3 |   | 3 2
-  ; \ | /   \ | /
+  ; 1 3 | = | 3 2
   ;  \|/     \|/
   ;   4       4
   (check-equal? (degrees->graphs '(2 2 2 3 3))
@@ -924,6 +924,14 @@
   ; |  / \|
   ; 1-'   4
   (check-equal? (degrees->graphs '(2 2 2 2 2 4)) '(((0 1) (0 2) (1 5) (2 5) (3 4) (3 5) (4 5))))
+
+;
+; 1-4     0-4-5-2     0-4-2   0-4-3   0-4 
+; | |\    |/   \|     | | |   | | |   | |\  
+; 0 | 3   1     3     | | | = | | |   | 2 3 
+; | |/                | | |   | | |   | |/
+; 2-5                 1-5-3   1-5-2   1-5 
+;  
   (check-equal? (degrees->graphs '(2 2 2 2 3 3))
                 '(((0 1) (0 2) (1 4) (2 5) (3 4) (3 5) (4 5))
                   ((0 1) (0 4) (1 4) (2 3) (2 5) (3 5) (4 5))
